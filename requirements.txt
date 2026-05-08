@@ -1,0 +1,58 @@
+# 쇼돈 예짜 — Python 패키지 의존성
+# Python 3.13 권장 (PEP 701 nested-quote f-string 사용)
+
+# GUI ----------------------------------------------------------------
+# ⚠️ qfluentwidgets 는 Qt binding 별로 별개 패키지가 있음. 우리는 PySide6 사용:
+#   - PyQt-Fluent-Widgets[full]    → PyQt5 (충돌 일으킴, 절대 X)
+#   - PyQt6-Fluent-Widgets[full]   → PyQt6
+#   - PySide6-Fluent-Widgets[full] → PySide6 ★ 우리는 이거
+PySide6>=6.6
+PySide6-Fluent-Widgets[full]   # qfluentwidgets (PySide6 변종)
+
+# 다운로드 -----------------------------------------------------------
+yt-dlp
+
+# 영상 분석 — STT (자동 자막) -----------------------------------------
+# ★ v1.9.3+ — mlx-whisper 단독 (faster-whisper 제거. 검증 결과 6.6x 빠름, 정확도 동일).
+# Apple Silicon Mac 만 동작. Intel Mac 또는 Linux 는 v2.0 에서 faster-whisper fallback 검토.
+mlx-whisper
+
+# 영상 분석 — 로컬 OCR (Apple Vision / PaddleOCR) ----------------------
+# ★ v1.9.3+ — Apple Vision (macOS 내장, Metal GPU, ~10x 빠름) default.
+# pyobjc-framework-Vision 으로 macOS Vision framework 호출.
+# Apple Silicon Mac 만 동작. PaddleOCR fallback 은 requirements-optional.txt.
+pyobjc-framework-Vision
+
+# 영상 분석 — 얼굴 검출 + 클러스터링 ---------------------------------
+# mediapipe 0.10.30+ 의 새 Tasks API (FaceDetector) 사용.
+# 첫 실행 시 ~200KB 모델 (blaze_face_short_range.tflite) 자동 다운로드.
+# v1.1 에서 InsightFace 로 마이그레이션 예정 (정확도↑ + 인물 식별).
+mediapipe>=0.10.30
+opencv-python
+
+# 영상 분석 — 로컬 OCR 더블체킹 (선택사항)
+# ⚠️ Python 3.13 까지만 wheel 지원. 3.14 venv 면 설치 실패함.
+# 활용하려면 별도 설치:  pip install -r requirements-optional.txt
+# 안 깔려있으면 1단계 분석의 ocr_local 단계 자동 SKIP.
+# (config.json 의 enable_local_ocr 는 그대로 두고, ImportError 시 단계 실패 처리됨)
+
+# 영상 분석 — 공통 ----------------------------------------------------
+numpy
+
+# 영상 편집 — PIL 템플릿 합성 ----------------------------------------
+Pillow
+
+# 영상 편집 — CapCut Draft 직접 생성 (v1.6 NEW) ----------------------
+# pycapcut: macOS draft_info.json 미지원 (Windows/JianYing 의 draft_content.json 만 출력).
+# → VectCutAPI 사용 (sun-guannan/VectCutAPI, IS_CAPCUT_ENV 분기로 macOS 호환).
+# v1.9.1 부터 VectCutAPI 코드는 본 repo 안 (VectCutAPI/) 에 통합 — 별도 clone 불필요.
+# 아래 deps 가 VectCutAPI 동작 의존성 (capcut_server.py port 9000 띄움).
+requests
+imageio
+psutil
+flask
+oss2
+json5
+
+# (시스템 의존성 — 별도 설치)
+# brew install ffmpeg

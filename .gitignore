@@ -1,0 +1,53 @@
+# venv
+videoEnv/
+.venv/
+venv/
+
+# config (사용자별 설정은 git 추적 X)
+config/config.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+.pytest_cache/
+
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# .app 빌드 산출물 (icon.svg → icon.icns 변환 + dist/.app 번들)
+dist/
+build/
+design/icon.icns
+design/icon.iconset/
+
+# 개발 중 임시 데이터 (실 데이터는 ~/showdon/yejjas/ 외부)
+data/
+test_data/
+
+# VectCutAPI 부산물 (★ v1.9 — dfd_cat 누적 회피)
+# CapCut Draft 생성 시 VectCutAPI 가 만드는 임시 폴더.
+# v1.9 부터 backend/edit.py 가 export 끝에 자동 move 하지만
+# 실패한 export 잔재 / 이전 누적 보호 위해 ignore.
+VectCutAPI/dfd_cat_*/
+VectCutAPI/server.log
+
+# Archive 폴더 (옛 SYSTEM_PROMPT / 일회성 brief 보관)
+# ★ v1.9.3+ — `.archive/` (dot prefix, Finder hidden) → `archive/` (Finder 가시화) 로 rename
+archive/
+.archive/
+
+# 개발자 본인 참고용 docs (팀원 배포에는 불필요 — 시스템 구동 X)
+PRD.md
+PROMPT_REFERENCE.md
+EDIT_INPUT_OUTPUT_SPEC.md
+COWORK_NOTES.md
+
+# Dev-only — 팀원 push X (사용자 본인 dev 환경만)
+ui/debug_tab.py
