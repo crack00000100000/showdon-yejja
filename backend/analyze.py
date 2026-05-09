@@ -412,7 +412,7 @@ def _ocr_local_apple_vision(
         )
 
     # lazy import (다른 OS 에서 import 에러 방지)
-    from Foundation import NSURL
+    from Foundation import NSURL, NSAutoreleasePool
     from Quartz import CIImage
     import Vision  # pyobjc-framework-Vision
 
@@ -431,48 +431,55 @@ def _ocr_local_apple_vision(
         if not frame_path.exists():
             continue
 
+        # ★ v1.9.5 — frame 단위 NSAutoreleasePool 으로 ObjC 객체 (NSURL/CIImage/VNRequest/VNHandler)
+        # 즉시 release 강제. 긴 영상 (수천 frame) 처리 시 ObjC 메모리 누적 → Qt paint 충돌 회피.
+        pool = NSAutoreleasePool.alloc().init()
         try:
-            url = NSURL.fileURLWithPath_(str(frame_path))
-            image = CIImage.imageWithContentsOfURL_(url)
-            if image is None:
+            try:
+                url = NSURL.fileURLWithPath_(str(frame_path))
+                image = CIImage.imageWithContentsOfURL_(url)
+                if image is None:
+                    continue
+
+                request = Vision.VNRecognizeTextRequest.alloc().init()
+                request.setRecognitionLanguages_(languages)
+                request.setRecognitionLevel_(0)  # Accurate (slower but best)
+                request.setUsesLanguageCorrection_(True)
+
+                handler = Vision.VNImageRequestHandler.alloc().initWithCIImage_options_(
+                    image, {}
+                )
+                success, error = handler.performRequests_error_([request], None)
+                if not success or error:
+                    continue
+
+                texts: list[str] = []
+                scores: list[float] = []
+                observations = request.results() or []
+                for obs in observations:
+                    top = obs.topCandidates_(1)
+                    if top and len(top) > 0:
+                        cc = top[0]
+                        text = str(cc.string()).strip()
+                        score = float(cc.confidence())
+                        if text and score >= min_score:
+                            texts.append(text)
+                            scores.append(score)
+            except Exception:
+                # 한 frame 실패 → skip (전체 단계 실패 방지)
                 continue
 
-            request = Vision.VNRecognizeTextRequest.alloc().init()
-            request.setRecognitionLanguages_(languages)
-            request.setRecognitionLevel_(0)  # Accurate (slower but best)
-            request.setUsesLanguageCorrection_(True)
-
-            handler = Vision.VNImageRequestHandler.alloc().initWithCIImage_options_(
-                image, {}
-            )
-            success, error = handler.performRequests_error_([request], None)
-            if not success or error:
-                continue
-
-            texts: list[str] = []
-            scores: list[float] = []
-            observations = request.results() or []
-            for obs in observations:
-                top = obs.topCandidates_(1)
-                if top and len(top) > 0:
-                    cc = top[0]
-                    text = str(cc.string()).strip()
-                    score = float(cc.confidence())
-                    if text and score >= min_score:
-                        texts.append(text)
-                        scores.append(score)
-        except Exception:
-            # 한 frame 실패 → skip (전체 단계 실패 방지)
-            continue
-
-        if texts:
-            entry = OcrLocalEntry(
-                i=cand.i,
-                t_abs=cand.t_abs,
-                text="\n".join(texts),
-                score=round(sum(scores) / len(scores), 3) if scores else 0.0,
-            )
-            entries.append(entry)
+            if texts:
+                entry = OcrLocalEntry(
+                    i=cand.i,
+                    t_abs=cand.t_abs,
+                    text="\n".join(texts),
+                    score=round(sum(scores) / len(scores), 3) if scores else 0.0,
+                )
+                entries.append(entry)
+        finally:
+            # autorelease pool drain — 이 frame 의 ObjC 객체 모두 release
+            del pool
 
         # progress (대략 0.5초마다 emit)
         now = time.time()
@@ -640,55 +647,63 @@ def _faces(
         base_options=base_options,
         min_detection_confidence=0.5,
     )
+    # ★ v1.9.5 — try/finally 로 detector.close() 강제 (영상 batch 작업 시 GPU context 누수 회피)
     detector = mp_vision.FaceDetector.create_from_options(options)
 
     frames = sorted(frames_dir.glob("f_*.jpg"))
     frame_records: list[FrameFaces] = []
     total = len(frames)
 
-    for i, fp in enumerate(frames):
-        if is_cancelled and is_cancelled():
-            raise AnalysisCancelled()
+    try:
+        for i, fp in enumerate(frames):
+            if is_cancelled and is_cancelled():
+                raise AnalysisCancelled()
 
-        # 1-indexed frame 의 시간 — fps=1.0 일 때 frame N → t = N - 1
-        t = i / fps_target
-        img = cv2.imread(str(fp))
-        if img is None:
-            continue
+            # 1-indexed frame 의 시간 — fps=1.0 일 때 frame N → t = N - 1
+            t = i / fps_target
+            img = cv2.imread(str(fp))
+            if img is None:
+                continue
 
-        h, w = img.shape[:2]
-        rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
-        result = detector.detect(mp_image)
+            h, w = img.shape[:2]
+            rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
+            result = detector.detect(mp_image)
 
-        faces_list: list[FaceDetection] = []
-        for d in (result.detections or []):
-            # 새 API: bounding_box (픽셀 단위) + categories[0].score
-            bb = d.bounding_box
-            score = float(d.categories[0].score) if d.categories else 0.0
-            faces_list.append(FaceDetection(
-                bbox_norm=FaceBboxNorm(
-                    x=round(bb.origin_x / w, 3) if w else 0.0,
-                    y=round(bb.origin_y / h, 3) if h else 0.0,
-                    w=round(bb.width / w, 3) if w else 0.0,
-                    h=round(bb.height / h, 3) if h else 0.0,
-                ),
-                score=round(score, 3),
-                cluster_id=None,
+            faces_list: list[FaceDetection] = []
+            for d in (result.detections or []):
+                # 새 API: bounding_box (픽셀 단위) + categories[0].score
+                bb = d.bounding_box
+                score = float(d.categories[0].score) if d.categories else 0.0
+                faces_list.append(FaceDetection(
+                    bbox_norm=FaceBboxNorm(
+                        x=round(bb.origin_x / w, 3) if w else 0.0,
+                        y=round(bb.origin_y / h, 3) if h else 0.0,
+                        w=round(bb.width / w, 3) if w else 0.0,
+                        h=round(bb.height / h, 3) if h else 0.0,
+                    ),
+                    score=round(score, 3),
+                    cluster_id=None,
+                ))
+
+            frame_records.append(FrameFaces(
+                t=round(t, 2),
+                frame=f"frames/{fp.name}",
+                faces=faces_list,
             ))
 
-        frame_records.append(FrameFaces(
-            t=round(t, 2),
-            frame=f"frames/{fp.name}",
-            faces=faces_list,
-        ))
-
-        if on_progress and (i + 1) % 50 == 0:
-            on_progress(AnalysisProgressEvent(
-                step="face_clusters", status=StepStatus.RUNNING,
-                percent=(i + 1) / max(total, 1) * 100.0,
-                message=f"{i + 1}/{total} 프레임",
-            ))
+            if on_progress and (i + 1) % 50 == 0:
+                on_progress(AnalysisProgressEvent(
+                    step="face_clusters", status=StepStatus.RUNNING,
+                    percent=(i + 1) / max(total, 1) * 100.0,
+                    message=f"{i + 1}/{total} 프레임",
+                ))
+    finally:
+        # ★ v1.9.5 — mediapipe Metal GPU context 강제 release (영상 batch 시 누수 방지)
+        try:
+            detector.close()
+        except Exception:
+            pass
 
     frames_with_face = sum(1 for r in frame_records if r.faces)
 
