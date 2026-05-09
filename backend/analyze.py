@@ -124,6 +124,112 @@ def _ffprobe(video_path: Path) -> tuple[VideoInfo, AudioInfo, float, int]:
 
 
 # =============================================================================
+# 단계 1b: 자막 감지 + transcript_source.json (★ v1.9.5 NEW)
+# yt-dlp 가 영상과 같이 받은 manual/auto 자막을 분석 폴더 subs/ 로 복사.
+# info.json 의 subtitles (manual) / automatic_captions (auto) 키로 정확히 구별.
+# 코워크가 dialog 작성 시 우선순위 결정 (manual > stt > auto).
+# =============================================================================
+
+def _detect_and_copy_transcripts(
+    video_path: Path,
+    output_dir: Path,
+) -> "TranscriptSourceJson":
+    """video_path 와 같은 디렉토리에서 yt-dlp 자막 + info.json 감지.
+
+    감지 대상:
+      - <stem>.ko.srt / <stem>.en.srt — yt-dlp `--write-subs` 결과
+      - <stem>.info.json — yt-dlp `--writeinfojson` 결과 (manual/auto 구별 메타)
+
+    info.json 'subtitles' 키 = manual 자막, 'automatic_captions' = auto 자막.
+    yt-dlp 는 manual 우선 다운 (둘 다 옵션 켜놔도). 같은 파일명 (.ko.srt) 로 받기 때문에
+    info.json 메타 없이는 manual/auto 구별 불가 → info.json 의무.
+
+    info.json 없으면 manual 가정 (기존 영상 / 직접 박은 srt 케이스).
+    자막 파일은 output_dir/subs/<lang>.srt 로 복사 (분석 결과 폴더 이주 시 손실 방지).
+    """
+    # lazy import (TranscriptSourceJson 의 schema_version 등 의존)
+    from backend.schema import TranscriptSourceJson, TranscriptSourceLang
+
+    parent = video_path.parent
+    stem = video_path.stem
+    info_path = parent / f"{stem}.info.json"
+    subs_dir = output_dir / "subs"
+
+    result = TranscriptSourceJson()
+
+    # info.json 로딩 (있으면 manual/auto 정확히 구별 / 없으면 manual 가정)
+    info: dict = {}
+    if info_path.exists():
+        try:
+            with open(info_path, "r", encoding="utf-8") as f:
+                info = json.load(f)
+            try:
+                result.info_json_relpath = str(info_path.name)
+            except Exception:
+                result.info_json_relpath = info_path.name
+        except Exception:
+            info = {}
+
+    manual_subs = (info.get("subtitles") or {}) if isinstance(info, dict) else {}
+    auto_subs = (info.get("automatic_captions") or {}) if isinstance(info, dict) else {}
+
+    for lang in ("ko", "en"):
+        srt_path = parent / f"{stem}.{lang}.srt"
+        if not srt_path.exists():
+            continue
+
+        # type 결정 (info.json 있으면 정확 / 없으면 manual 가정)
+        if info:
+            if lang in manual_subs:
+                sub_type = "manual"
+            elif lang in auto_subs:
+                sub_type = "auto"
+            else:
+                # info 에 메타 없는데 srt 파일 있으면 사용자가 직접 박은 것 — manual 가정
+                sub_type = "manual"
+        else:
+            sub_type = "manual"
+
+        # subs/ 로 복사
+        try:
+            subs_dir.mkdir(parents=True, exist_ok=True)
+            dest = subs_dir / f"{lang}.srt"
+            import shutil
+            shutil.copy2(srt_path, dest)
+        except Exception:
+            continue
+
+        # segment count (디버그용 — srt 의 number prefix `^\d+$` 카운트)
+        seg_count = 0
+        try:
+            with open(dest, "r", encoding="utf-8") as f:
+                for line in f:
+                    if line.strip().isdigit():
+                        seg_count += 1
+        except Exception:
+            pass
+
+        result.sources.append(TranscriptSourceLang(
+            lang=lang,
+            type=sub_type,
+            path=f"subs/{lang}.srt",
+            segment_count=seg_count,
+        ))
+
+    # preference 결정 — manual 한 lang 이라도 있으면 manual / 없으면 auto / 없으면 none
+    has_manual = any(s.type == "manual" for s in result.sources)
+    has_auto = any(s.type == "auto" for s in result.sources)
+    if has_manual:
+        result.preference = "manual"
+    elif has_auto:
+        result.preference = "auto"
+    else:
+        result.preference = "none"
+
+    return result
+
+
+# =============================================================================
 # 단계 2: STT — mlx-whisper (Apple MLX / Metal GPU)
 # ★ v1.9.3+ — faster-whisper 제거됨 (검증 결과 mlx 6.6x 빠름, 정확도 동일)
 # =============================================================================
@@ -840,6 +946,31 @@ def analyze_video(
             record_error("ffprobe", str(e))
             emit("ffprobe", StepStatus.FAILED, 0, str(e))
             raise  # 치명적
+
+        cancel_check()
+
+        # ====================================================================
+        # 1b. 자막 감지 + transcript_source.json (★ v1.9.5 NEW)
+        # 실패해도 STT/OCR/face 는 그대로 진행 (선택적 보강 단계)
+        # ====================================================================
+        emit("transcript_source", StepStatus.RUNNING)
+        t0 = time.time()
+        try:
+            transcript_source = _detect_and_copy_transcripts(video_path, output_dir)
+            ts_path = output_dir / "transcript_source.json"
+            save_dataclass(transcript_source, ts_path)
+            n = len(transcript_source.sources)
+            pref = transcript_source.preference
+            update_step("transcript_source", StepStatus.COMPLETED, time.time() - t0,
+                        sources=n, preference=pref)
+            emit("transcript_source", StepStatus.COMPLETED, 100.0,
+                 f"{n}개 자막 / preference={pref}", time.time() - t0)
+        except Exception as e:
+            # 실패해도 치명적 X — 다음 step 진행
+            update_step("transcript_source", StepStatus.FAILED, time.time() - t0,
+                        error=str(e))
+            record_error("transcript_source", str(e))
+            emit("transcript_source", StepStatus.FAILED, 0, str(e))
 
         cancel_check()
 
