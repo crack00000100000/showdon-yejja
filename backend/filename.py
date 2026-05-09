@@ -15,27 +15,42 @@ import re
 from datetime import datetime
 from typing import Optional
 
-# 파일명에서 금지된 문자 (macOS / Windows 양쪽 안전 집합)
-_FORBIDDEN = re.compile(r'[\\/:*?"<>|\x00-\x1f]')
-# 연속 공백/마침표 정리
+# ★ v1.9.6 — 파일명 안전 문자 whitelist 접근 (★ 룰 강화)
+#
+# 배경: v1.9.5 까지 _FORBIDDEN 은 path-unsafe (`\\/:*?"<>|`) + 제어문자 만 제거 →
+# 중간 `.` `'` `(` `,` 등 일반 punctuation 그대로 살아남음.
+# 결과: macOS Finder 에서 폴더 복제·rename 시 `.` 으로 인한 "확장자 변경" 알림 빈번.
+# 그 외 path/CLI 마찰 (따옴표·괄호·쉼표 등) 도 회피 의무.
+#
+# 새 룰: whitelist 접근 — `\w` (영숫·`_`·Unicode 글자: 한글·CJK·hiragana·katakana 다 포함)
+# + `\s` (공백→`_` 별도 처리) + `-` (하이픈) 만 허용. 그 외 다 제거.
+# 제거 대상 예시: `. ' " ( ) [ ] { } , ; : ! ? @ # $ % ^ & * + = ~ \` ` `|` `\` `/` `<` `>`
+# + curly quotes (U+2018·9·201C·D)
+_DISALLOWED = re.compile(r"[^\w\s-]", flags=re.UNICODE)
+# 연속 공백 정리
 _WHITESPACE = re.compile(r"\s+")
 _TITLE_MAX_LEN = 100
 
 
 def sanitize_title(title: Optional[str]) -> str:
-    """파일명에 안전한 형태로 제목을 정제. 공백은 _ 로 치환."""
+    """
+    파일명에 안전한 형태로 제목을 정제. 공백은 _ 로 치환.
+
+    ★ v1.9.6 — whitelist 접근 (영숫·한글·CJK·`_-` 만 허용, 그 외 다 제거).
+    """
     if not title:
         return "untitled"
-    cleaned = _FORBIDDEN.sub("", title)
-    # 모든 공백류(스페이스/탭/줄바꿈) → _ 로 치환 + 연속된 _ 는 하나로
+    # 1. whitelist — 허용 문자 (\w + \s + -) 외 다 제거
+    cleaned = _DISALLOWED.sub("", title)
+    # 2. 모든 공백류(스페이스/탭/줄바꿈) → _ 로 치환 + 연속된 _ 는 하나로
     cleaned = _WHITESPACE.sub("_", cleaned)
     cleaned = re.sub(r"_+", "_", cleaned)
-    # 시작/끝의 마침표/언더스코어 정리 (hidden file 방지 + 깔끔)
-    cleaned = cleaned.strip("._")
+    # 3. 시작/끝의 마침표/언더스코어/하이픈 정리 (hidden file 방지 + 깔끔)
+    cleaned = cleaned.strip("._-")
     if not cleaned:
         cleaned = "untitled"
     if len(cleaned) > _TITLE_MAX_LEN:
-        cleaned = cleaned[:_TITLE_MAX_LEN].rstrip("._")
+        cleaned = cleaned[:_TITLE_MAX_LEN].rstrip("._-")
     return cleaned
 
 
