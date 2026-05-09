@@ -952,7 +952,10 @@ def analyze_video(
         # ====================================================================
         # 1b. 자막 감지 + transcript_source.json (★ v1.9.5 NEW)
         # 실패해도 STT/OCR/face 는 그대로 진행 (선택적 보강 단계)
+        # ★ v1.9.6 — transcript_source.preference 가 frame_extraction step 의
+        #   하이브리드 fps 분기에 사용되므로 변수 None 초기화 (try 실패 대응)
         # ====================================================================
+        transcript_source = None
         emit("transcript_source", StepStatus.RUNNING)
         t0 = time.time()
         try:
@@ -1063,7 +1066,18 @@ def analyze_video(
 
         # ====================================================================
         # 4. Frame extraction
+        # ★ v1.9.6 — 하이브리드 fps 분기 (transcript_source.preference 기반)
+        #   - manual srt 있음 → config.frame_extraction_fps 그대로 (1.0 디폴트, 시간 절약)
+        #   - manual 없음 → 2배 정밀 (0.5초당 1프레임 = fps 2.0). 화자 매칭 / OCR 시각 / scene 정밀도 ↑
+        # 같은 effective_fps 를 ocr_candidates + face_clusters 에도 전달 (3 단계 정합)
         # ====================================================================
+        _ts_pref = transcript_source.preference if transcript_source else "none"
+        effective_fps = (
+            config.frame_extraction_fps
+            if _ts_pref == "manual"
+            else config.frame_extraction_fps * 2.0
+        )
+
         n_frames = 0
         frames_dir = output_dir / "frames"
         emit("frame_extraction", StepStatus.RUNNING)
@@ -1071,14 +1085,15 @@ def analyze_video(
         try:
             n_frames = _extract_frames(
                 video_path, frames_dir,
-                fps_target=config.frame_extraction_fps,
+                fps_target=effective_fps,
                 scale_w=config.frame_scale_w,
                 is_cancelled=is_cancelled,
             )
             update_step("frame_extraction", StepStatus.COMPLETED, time.time() - t0,
-                        fps=config.frame_extraction_fps, frame_count=n_frames)
+                        fps=effective_fps, base_fps=config.frame_extraction_fps,
+                        transcript_preference=_ts_pref, frame_count=n_frames)
             emit("frame_extraction", StepStatus.COMPLETED, 100.0,
-                 f"{n_frames} 프레임", time.time() - t0)
+                 f"{n_frames} 프레임 (fps={effective_fps}, pref={_ts_pref})", time.time() - t0)
         except AnalysisCancelled:
             raise
         except Exception as e:
@@ -1104,7 +1119,7 @@ def analyze_video(
                      "STT/frames 부족")
             else:
                 ocr = _build_ocr_candidates(
-                    stt, scenes, n_frames, config.frame_extraction_fps
+                    stt, scenes, n_frames, effective_fps
                 )
                 save_dataclass(ocr, output_dir / "ocr_candidates.json")
                 update_step("ocr_candidates", StepStatus.COMPLETED, time.time() - t0,
@@ -1208,7 +1223,7 @@ def analyze_video(
                         on_progress(evt)
 
                 faces = _faces(frames_dir,
-                               fps_target=config.frame_extraction_fps,
+                               fps_target=effective_fps,
                                on_progress=face_cb,
                                is_cancelled=is_cancelled)
                 save_dataclass(faces, output_dir / "face_clusters.json")
