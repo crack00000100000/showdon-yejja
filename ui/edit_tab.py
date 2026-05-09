@@ -323,7 +323,10 @@ class EditTab(QWidget):
                 f"{evt.step}: {evt.message}" if evt.message else evt.step
             )
             if evt.percent > 0:
-                self.progress_bar.setValue(int(evt.percent))
+                # ★ v1.9.5 — 같은 정수면 setValue skip (macOS 26.x + Qt 6.11 paint pipeline 충돌 회피)
+                new_val = int(evt.percent)
+                if new_val != self.progress_bar.value():
+                    self.progress_bar.setValue(new_val)
             # 단계 전환 시 로그 + 메시지 있으면 로그
             if evt.step != last_step["name"]:
                 last_step["name"] = evt.step

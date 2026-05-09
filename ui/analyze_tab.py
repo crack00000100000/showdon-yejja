@@ -533,7 +533,10 @@ class AnalyzeTab(QWidget):
             self.step_label.setText(label)
 
         if evt.percent > 0:
-            self.progress_bar.setValue(int(evt.percent))
+            # ★ v1.9.5 — 같은 정수면 setValue skip (macOS 26.x + Qt 6.11 paint pipeline 충돌 회피)
+            new_val = int(evt.percent)
+            if new_val != self.progress_bar.value():
+                self.progress_bar.setValue(new_val)
 
         # 단계 SKIPPED 면 로그 (1번만) + 다음 단계 전환 시 "완료" 로그 생략 마킹
         if evt.status == StepStatus.SKIPPED and not self._current_step_skipped:

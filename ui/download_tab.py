@@ -169,7 +169,10 @@ class DownloadTab(QWidget):
         elif p.status == "downloading":
             title = (p.title or p.url)[:60]
             self.progress_label.setText(f"다운로드 중: {title}")
-            self.progress_bar.setValue(int(p.percent))
+            # ★ v1.9.5 — 같은 정수면 setValue skip (macOS 26.x + Qt 6.11 paint pipeline 충돌 회피)
+            new_val = int(p.percent)
+            if new_val != self.progress_bar.value():
+                self.progress_bar.setValue(new_val)
             speed_eta = []
             if p.speed_str:
                 speed_eta.append(p.speed_str)
