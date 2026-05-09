@@ -1,4 +1,4 @@
-# Quick-Reference 체크리스트 (★ v1.9.1 NEW — 작성 시 항상 참조 / ★ v1.9.5 manual srt 우선순위 추가)
+# Quick-Reference 체크리스트 (★ v1.9.1 NEW — 작성 시 항상 참조 / ★ v1.9.5 manual srt 우선순위 추가 / ★ v1.9.6 manual srt timeline 매핑 + sub_cut 분할 cargo cult fix + explain 매너리즘 fix)
 
 > v1.9 의 self-check 19개 / 강제 룰 폭증 → cognitive load 위험.
 > 이 체크리스트는 **작성 마치고 출력 직전 1-page 만 순회** 하는 용도.
@@ -11,12 +11,13 @@
 - [ ] selection_reason 에 셋업~펀치~여운 자연 호흡 사이클 명시 (§9.3)
 - [ ] 떡밥 패턴 (영상에서 안 풀림) 회피 (§10)
 
-## 모드 B-1 Preview 작성 — 출력 직전 체크 (★ v1.9.5 hard rule 13개 + soft 권장)
+## 모드 B-1 Preview 작성 — 출력 직전 체크 (★ v1.9.6 hard rule 17개 + soft 권장)
 
 ### Hard rule (위반 시 Preview 출력 X — 무조건 재작성)
 
 - [ ] **★ v1.9.5 §6.2c manual srt 우선순위** — 분석 폴더 `transcript_source.json` 읽고 `preference` 분기. `manual` 이면 dialog 텍스트는 manual srt 그대로 (STT 무시) / timing·비언어는 STT 보강. `auto`·`none` 이면 v1.9.4 흐름 그대로
-- [ ] **§6.1 sub_cut boundary STT segment 한복판 X** — 위반 시 보정 A/B 적용
+- [ ] **§6.1 sub_cut boundary STT segment 한복판 X** — 위반 시 보정 A/B 적용. ★ v1.9.6 — `preference == "manual"` 일 때 manual srt segments 도 동일 boundary 검증 의무 (sub_cut.start/end 가 manual segment 한복판이면 위반)
+- [ ] **★ v1.9.6 §6.1 sub_cut 분할 cargo cult 회피** — 영상 길이별 *최소* sub_cut 갯수 강제 (20s+ 최소 2 / 30s+ 최소 3 / 45s+ 최소 4). scene_cut 3개+ 내장 sub_cut 분할 안 했으면 의도 명시 의무
 - [ ] **§10 제목 매치 ≥ 50%** (모드 B 시점 — dialog.srt 본문 기준 재검증)
 - [ ] **§6.2 timeline 시각** — `abs(SRT_max_end - sub_cut_total) ≤ 0.5s`
 - [ ] **§6.2 음성 전체 보존** — dialog 임의 생략·요약·축약 X
@@ -28,6 +29,9 @@
 - [ ] **★ v1.9.4 §9.5 화자 매칭 검증** — "X 본인", "Y 가 직접" 같이 인물 명시한 explain 박을 때 STT speaker_id + face_clusters dominant 일치하는지 한 번 더 확인. 추측 화자 명시 X
 - [ ] **★ v1.9.4 §9.6 white/black list 회피** — black list 단어 (좌중/사이클/디테일/완성도/케미/연출이 살아있/편집팀이 잘/타이밍 미쳤 등) 검수. 매너리즘·남의 채널 칭찬·자막 분석 카피 X
 - [ ] **★ v1.9.4 §9.6 시리즈 reference 검증** — "X 시리즈에 Y 추가" 같은 시리즈 reference 박을 때 영상 안에서 X 가 실제로 언급/시청자 공유 fact 인지 확인. 추정 X
+- [ ] **★ v1.9.6 §6.2c manual ↔ dialog timeline 1:1 매핑 자동 검증** (★ hard rule 16) — `preference == "manual"` 일 때 dialog[i] = manual_overlap[i] 1:1 매핑. dialog[i].text 는 manual segment 텍스트 그대로 (curly→straight quote / 마침표 추가 / 띄어쓰기 보정 등 모두 X). dialog[i].start = manual_seg.start - sub_cut.start (clamp). 한 칸 shift bug 회피
+- [ ] **★ v1.9.6 §9.6 explain 라인 *최소* 강제** (★ hard rule 17) — 영상 길이별 최소: 20~25s 6 / 25~30s 7 / 30~40s 8 / 40s+ 10 라인. cap (max 25~35%) 의 함정 회피 — 5라인 cap 안전 패턴 X
+- [ ] **★ v1.9.6 §9.5 동사형 행동 표현 화자 매칭 검증** — 받아치는데 / 토로하는데 / 회상하는데 / 항변하는데 / 모방하며 / 셋업·빌드업하는데 / 묻는데·답하는데 / 자뻑·자수·자포자기 등 동사형 explain 라인도 face_cluster + STT 검증 의무
 
 ### Soft rule (권장 — 노력해서 조정, hard 깨면서까지 X)
 
@@ -37,6 +41,8 @@
 - [ ] explain 분포 영상 3등분 중 2영역+ 분산 (§9.6)
 - [ ] **★ v1.9.3 explain 리뷰어 시점** — 카테고리 1 (영상 평가) 50%+ 권장, `~는데` 어미 35%+ (§9.6)
 - [ ] **★ v1.9.3 explain 도입부 패턴 5종** — 한 채널 안 같은 패턴 3회 연속 X (§9.6)
+- [ ] **★ v1.9.6 explain 도입부 패턴 (1) batch 사용률 < 30%** — 한 batch (N 영상) 안 패턴 (1) `(X 들어가는데/사연인데/토로하는데)` 사용률 30% cap. 패턴 (2)~(5) 의무 배분 (영상 평가형 30%+ / 명장면 20%+ / 빌드업·펀치 예고 합산 20%+) (§9.6)
+- [ ] **★ v1.9.6 explain 매너리즘 어휘 cap** — '미친' / '미쳤' < 15% / '명대사' < 10% / 'ㄷㄷ·ㅋㅋ 단독 마무리' < 50%. 대체 어휘 (죽이는 / 신박한 / 압도적 / 한 줄 정리 / 정점 / 헐 / 와 / 핵 등) 사용 (§9.6)
 - [ ] **★ v1.9.3 explain 시점별 톤** — 도입/셋업/펀치/반응/마무리 차별화 (§9.6)
 - [ ] **★ v1.9.3 화자 겹침 처리** — 짧은 (< 1.5s) 슬래시 / 긴 (≥ 1.5s) 분할 entry (§6.2 7번)
 - [ ] **★ v1.9.2 인물 호칭 우선순위** — 영상 안 호칭/애칭 → 공용 호칭 시 web_search 실명 → fallback (§9.5)
@@ -287,6 +293,50 @@ STT segments:
 ✅ 보정 A: end_s = 15.1 (segment 끝 + 0.3)
 ✅ 보정 B: end_s = 12.45 (segment 시작 직전)
 ```
+
+#### ★ v1.9.6 — sub_cut.start/end manual srt segment 정합 의무 (★ hard rule, boost A)
+
+> **★ 배경**: v1.9.5 9개 영상 audit (본헤이터 EP) — 9/9 영상이 단일 sub_cut, 8/9 (89%) 의 sub_cut.start 가 manual segment 한복판, 6/9 (67%) 의 sub_cut.end 가 manual segment 한복판. 가장 심각한 양아치 영상은 4.0s manual segment 의 3.2s 안 (80%) 에서 sub_cut 시작 = 첫 0.4s 가 끝나가는 발화의 끝부분만 노출.
+
+**v1.9.6 룰** — `preference == "manual"` 일 때 manual srt segments 도 §6.1 v1.9 와 동일한 boundary 검증 의무:
+
+1. **sub_cut.start 가 manual segment 한복판이면 위반**:
+   - `manual_seg.start + 0.1 ≤ sub_cut.start ≤ manual_seg.end - 0.1` 인 manual segment 가 있으면 위반
+2. **sub_cut.end 도 동일** — manual segment 한복판이면 위반
+3. **보정 (보정 A/B 동일 — manual 버전)**:
+   - **(보정 A)** `sub_cut.start = manual_seg.start` (segment 시작까지 확장 — 음성 보존, 자연스러움)
+   - **(보정 B)** `sub_cut.start = manual_seg.end + 0.05` (segment 끝 직후까지 축소)
+   - 보통 (A) 가 자연스러움. (A) 로 sub_cut 길이 너무 길어지면 (B) 채택
+4. **자동 검증 — Preview 단계 self-check 의무** (§13.5 9번 신설)
+
+**근거**: §6.2c 의 manual srt → dialog timeline 매핑 알고리즘 (boost B) 이 정확하려면 sub_cut.start/end 가 manual segment.start/end 에 정합해야 한 칸 shift bug 회피 가능. boundary 한복판이면 dialog 첫 라인 의 시각 매핑 깨짐 (3/9 영상 발생).
+
+#### ★ v1.9.6 — sub_cut 분할 cargo cult 회피 (★ hard rule, boost A)
+
+> **★ 배경**: v1.9.5 9개 영상 audit — **9/9 영상이 단일 sub_cut**. sub_cut 안에 scene_cut 3~9개 내장돼 있는데도 분할 0회. v1.8 의 "한국 쇼츠 = 단일 컷에 자막만 변화" 원칙을 코워크가 *극단적*으로 해석해 sub_cut 분할 자체를 회피한 cargo cult.
+
+**v1.9.6 룰**:
+
+1. **영상 길이별 *최소* sub_cut 갯수** (★ hard):
+   - 20s 미만: 1개 가능
+   - 20~30s: **최소 2개** (scene_cut 2개+ 내장 시)
+   - 30~45s: **최소 3개** (scene_cut 4개+ 내장 시)
+   - 45s+: **최소 4개**
+
+2. **sub_cut 분할 trigger 우선순위** (★ 명시):
+   - scene_cut 직후 (강한 컷)
+   - 화자 변화 (face cluster dominant 변화 + STT silence 0.5s+)
+   - 펀치라인 직전 (셋업~펀치 호흡 분리)
+
+3. **단일 sub_cut 케이스 self-check 의무**:
+   - sub_cut 안에 scene_cut **3개+** 있으면 "왜 분할 안 했나" 의도 명시 의무 (예: `selection_reason` 또는 sub_cut comment 에 "한 화자의 narrative 흐름 유지 위해 분할 회피")
+   - 의도 명시 X 면 분할 의무
+
+4. **§9.1 focus_box 디폴트 null 룰과의 정합**:
+   - sub_cut 분할 != focus_box 박는 것. focus_box 는 §9.1 그대로 디폴트 null.
+   - sub_cut 분할 의의 = 화자별 zoom 효과·dialog 페이싱·explain 시점 분리 등 룰 적용 단위 분리.
+
+**근거**: 분할 안 하면 focus_box 단일 (화자별 zoom X), §13.5 4번 검증 X, 시청자 입장 단조로움. v1.8 의 "단일 컷에 자막만 변화" 원칙은 *cut 갯수 보수화* (푸히호 평균 0.15 vs v1.7 1.65 11배 차이) 의도였지 sub_cut 자체 단일화 의도 X.
 
 **2-bis. 검정 인터스티셜 frame 회피** ★ v1.3 + v1.4 강화 — 원본 영상의 챕터 구분 검정 컷씬 (예: "다음 질문", "논쟁 끝", "와이프 혼난" 같은 검정 + 큰 글씨) 이 sub_cut 경계에 끼거나 sub_cut 안에 들어있으면 어색. 회피 룰:
 
@@ -541,6 +591,133 @@ manual srt 텍스트와 STT 텍스트 다르면:
 00:00:07,400 --> 00:00:08,400
 진짜...
 ```
+
+#### ★ v1.9.6 — manual srt → dialog timeline 매핑 알고리즘 (★ hard rule, boost B)
+
+> **★ 배경**: v1.9.5 9개 영상 audit (본헤이터 EP) — 3개 영상 (EPIK·마늘·양아치, 33%) 에서 dialog 라인 N 의 텍스트 = manual 라인 M, 시각 = manual 라인 M+1 의 **한 칸 shift bug** 발생. shift 폭 +1.0~2.8s. 영상 첫 부분 자막이 1~3초 늦게 노출됨. 코워크의 timeline 변환 알고리즘 bug — sub_cut 직전에 끝나는 manual segment 의 발화도 sub_cut 안에 음성 포함 시 그 segment 텍스트를 dialog 라인 1로 박는데 시각은 다음 segment 의 end - sub_cut.start 로 계산하는 패턴.
+
+**v1.9.6 표준 알고리즘** — `preference == "manual"` 일 때 dialog.srt 작성 시 다음 pseudocode 강제:
+
+```python
+# 1. sub_cut 안에 음성 포함하는 manual segments 추출 (overlap 0.3s 허용)
+overlap_manuals = [
+    m for m in manual_srt
+    if m.end > sub_cut.start - 0.3 and m.start < sub_cut.end + 0.3
+]
+
+# 2. 각 manual segment 의 텍스트와 시각을 1:1 매핑하여 dialog 라인 작성:
+for i, m in enumerate(overlap_manuals):
+    dialog[i].text  = m.text                                 # ★ 텍스트 그대로 (★ 변형 X — curly quote 도 그대로)
+    dialog[i].start = max(0, m.start - sub_cut.start)        # ★ 시각 = m.start - sub_cut.start
+    dialog[i].end   = min(sub_cut.duration, m.end - sub_cut.start)
+
+# 3. 첫 segment 가 sub_cut 시작 전에 시작 (m.start < sub_cut.start) 하면:
+#    - dialog[0].start = 0.0 (clamp)
+#    - dialog[0].text  = m.text (그대로)
+#    - 음성이 sub_cut 시작과 동시에 들리니 자연스러움
+
+# 4. 마지막 segment 가 sub_cut 끝 이후에 끝나면 동일 clamp
+
+# ★ 금지 패턴 (★ shift bug 의 직접 원인):
+# - dialog[0].end = next_manual.end - sub_cut.start  (← 한 칸 shift bug)
+# - 누적 합산 시 manual segment 의 길이 무시
+```
+
+**★ 핵심 원칙** — `dialog[i].time` 은 항상 그 라인의 *원본 manual segment* 의 시각으로 결정. 다음 manual segment 의 시각으로 박으면 안 됨 (shift bug).
+
+#### ★ v1.9.6 — sub_cut.start ↔ manual segment 정합 케이스 분석 (★ hard rule, boost B)
+
+> **★ 배경**: v1.9.5 9개 영상 audit — shift bug 발생 영상 (3개) vs 정상 영상 (6개) 의 차이 분석. shift bug 발생 트리거 = sub_cut.start = manual segment.end (즉 두 segment 의 boundary) 이고 직전 segment 의 발화가 sub_cut 안에 음성 포함 시.
+
+**케이스 분석** — sub_cut.start 과 manual segment 의 관계 3가지:
+
+| 케이스 | 상황 | 처리 |
+|---|---|---|
+| **A** | `sub_cut.start == manual_seg[N].start` (정확 정합) | dialog 라인 1 부터 manual_seg[N] 매핑. 정상. |
+| **B** | `sub_cut.start == manual_seg[N-1].end == manual_seg[N].start` (sub_cut 시작이 두 segment 의 boundary) | manual_seg[N-1] 음성도 sub_cut 안에 들리는지 영상 확인. 들리면 → **권장: sub_cut.start = manual_seg[N-1].start** (보정 A — 음성 보존). 안 들리면 → dialog 는 manual_seg[N] 부터 시작. |
+| **C** | `sub_cut.start ∈ (manual_seg[N].start, manual_seg[N].end)` (한복판) | §6.1 v1.9.6 boost A 의 보정 적용 — (보정 A) sub_cut.start = manual_seg[N].start 또는 (보정 B) sub_cut.start = manual_seg[N].end + 0.05 |
+
+**★ 핵심** — 케이스 B 가 shift bug 의 hot spot. sub_cut.start 가 두 manual segment 의 boundary 일 때 직전 segment (manual_seg[N-1]) 의 텍스트를 dialog[0] 로 박을지 결정 + 박을 거면 sub_cut.start 를 manual_seg[N-1].start 까지 보정해야 시각 매핑이 맞음.
+
+**자동 검증** — Preview 단계 self-check 의무 (§13.5 9번 신설). 케이스 분류 + 보정 추천 자동 출력.
+
+#### ★ v1.9.6 — manual srt 텍스트 변형 금지 강화 (★ hard rule, boost B)
+
+> **★ 배경**: v1.9.5 9개 영상 audit — 3개 영상 (빵집·캡차·코첼라, 33%) 에서 manual srt 의 **curly quote** (`"..."` U+201C/D, `'...'` U+2018/9) 가 dialog.srt 에서 **straight quote** (`"..."` U+0022) 로 변형. 일부 영상은 마침표 추가도 발견. §6.2c v1.9.5 hard rule "manual srt 텍스트 임의 변형 X" 형식적 위반.
+
+**v1.9.6 금지 항목 명시화** — 다음은 모두 임의 변형, 절대 금지:
+
+- ❌ **curly quote** (`" " ' '` U+201C/D, U+2018/9) → **straight quote** (`" '` U+0022, U+0027) 변환
+- ❌ **마침표 추가/삭제** (예: `'어? 저거..'` → `"어? 저거..."`)
+- ❌ **ASCII 변환** (전각 → 반각, 전각 따옴표 → 반각)
+- ❌ **띄어쓰기 보정** (manual 의 띄어쓰기 그대로)
+- ❌ **검열 패턴 변형** (`이C` → `이쒸` / `xx`)
+- ❌ **강조 변형** (`너~무` → `너무`)
+- ❌ **줄바꿈 합치기** — manual srt 의 한 segment 안 줄바꿈 `\n` 그대로 보존
+
+**근거**: manual srt 는 채널 시그니처 (`너~무`, `'어? 저거..'`, curly quote 등 = 채널 정체성). 변형은 채널 정체성 손상.
+
+**★ 검증** — dialog.srt 작성 후 각 라인 텍스트가 manual srt 의 정확한 substring (또는 manual segment 의 텍스트 그대로) 인지 verify 의무. 가벼운 변형 (curly→straight quote) 도 위반.
+
+#### v1.9.6 매핑 예시 (★ shift bug 회피 정공법)
+
+**시나리오** — sub_cut: `251.884 ~ 278.711`, manual ko.srt 의 segment 173~178:
+
+```
+manual ko.srt:
+  [173] 250.283~251.884 "나 오늘 생마늘 먹을 거야~"   ← sub_cut 직전 segment (B 케이스 후보)
+  [174] 251.884~253.286 "누구한테 얘기하는 거예요?"
+  [175] 253.286~254.254 "와이프"
+  [176] 254.254~256.055 "여보, 나 오늘 생마늘 먹을 거야"
+  [177] 256.055~257.890 "다시 싸"
+  [178] 257.890~260.234 "다시 싸 다시 싸 다시 싸"
+```
+
+**케이스 B 분석** — sub_cut.start = 251.884 = manual[173].end = manual[174].start.
+manual[173] 음성 ("나 오늘 생마늘 먹을 거야~") 이 sub_cut 안에 들리면 (확인 필요):
+- 들리면 → sub_cut.start = 250.283 (manual[173].start, 보정 A)
+- 안 들리면 → dialog 는 manual[174] 부터 시작.
+
+**시나리오: sub_cut.start = 250.283 으로 보정 (manual[173] 음성 들림)**:
+
+```srt
+1
+00:00:00,000 --> 00:00:01,601
+나 오늘 생마늘 먹을 거야~
+
+2
+00:00:01,601 --> 00:00:03,003
+누구한테 얘기하는 거예요?
+
+3
+00:00:03,003 --> 00:00:03,971
+와이프
+
+4
+00:00:03,971 --> 00:00:05,772
+여보, 나 오늘 생마늘 먹을 거야
+
+5
+00:00:05,772 --> 00:00:07,607
+다시 싸
+...
+```
+
+✅ 각 dialog[i].text = manual[N+i].text (그대로) / dialog[i].start = manual[N+i].start - sub_cut.start.
+
+❌ **shift bug 패턴** (회피 의무):
+
+```srt
+1
+00:00:00,000 --> 00:00:01,402
+나 오늘 생마늘 먹을 거야~              ← text = manual[173], 시각 = manual[174] - sub_cut.start
+
+2
+00:00:01,402 --> 00:00:02,370
+누구한테 얘기하는 거예요?              ← text = manual[174], 시각 = manual[175] timeline
+...
+```
+
 **8. dialog.srt 작성** ★ v1.7 핵심 변경 — 표준 SRT (UTF-8, BOM 없음):
 
 #### 시각 룰
@@ -1228,17 +1405,22 @@ sub_cut[5] = 22.0~26.0 (좌중 폭소)
   "score": 0
 }
 ```
-**13.5. 통합 음성-자막 sync 재검증** (★ v1.9.3 — 6 항목으로 확장, hard rule):
+**13.5. 통합 음성-자막 sync 재검증** (★ v1.9.6 — 9 항목으로 확장, hard rule):
 
-> **★ v1.9.3 정체성 — 통합 final pass + explain fact 근거 검증**
+> **★ v1.9.6 정체성 — manual srt timeline + sub_cut boundary + explain 매너리즘 자동 검증 추가**
 >
-> v1.9.1 의 5 항목 + ★ v1.9.3 NEW 6번 항목 — explain 라인의 **fact 근거 명시 검증**. 사용자 피드백 "explain 재미·맥락 부족" → fact 근거 룰 (§9.6) 의 self-check 강제.
+> v1.9.3 의 5 항목 + v1.9.4 의 6번 (fact 근거) + ★ v1.9.6 NEW 7~9번 항목.
+>
+> **v1.9.6 NEW**:
+> - **7번 — manual ↔ dialog timeline 1:1 매핑 자동 검증** (boost B / shift bug 회피)
+> - **8번 — explain 매너리즘 자동 측정** (boost D / 도입부 패턴 분포 / '미친' 사용률 / 라인 수 vs 최소)
+> - **9번 — sub_cut.start/end ↔ manual segment 정합 검증** (boost A / 보정 A/B 자동 추천)
 >
 > ★ v1.9.3 — **두 시점 검증** (모드 B 분리에 따라):
-> - **Preview 검증** (모드 B-1, 채팅 출력 직전) — 6 항목 모두 통과 후 사용자에게 preview 출력
+> - **Preview 검증** (모드 B-1, 채팅 출력 직전) — 9 항목 모두 통과 후 사용자에게 preview 출력
 > - **저장 직전 검증** (모드 B-2, _READY 박기 직전) — 사용자 수정 누적 후 sync 재검증. 두 번째 검증.
 
-#### 검증 6 항목 (모두 통과 의무)
+#### 검증 9 항목 (모두 통과 의무)
 
 | # | 검증 | 방법 | 통과 기준 |
 |---|---|---|---|
@@ -1248,6 +1430,9 @@ sub_cut[5] = 22.0~26.0 (좌중 폭소)
 | 4 | dialog text ↔ STT word text 비교 | 각 entry text 의 어절을 같은 시각의 `stt.segments[].words[].word` 와 비교 | 일치 또는 OCR 우선 (§6.2b) 으로 명시적 보정만 |
 | 5 | explain 라인 ↔ 그 시각 dialog/STT 컨텍스트 일치 | explain "(여기서 빵 터짐 ㅋㅋㅋ)" 인데 그 시각 ±2s 안 STT 에 웃음/감탄 없으면 위반 | 컨텍스트 매치 또는 explain 라인 삭제 |
 | **6 ★ v1.9.3 + 강화 v1.9.4** | **explain 라인 fact 근거 — STT 원본 grep 검증** | 모든 explain 라인의 fact (인물 행동 / 발화 / 반응 / 컨텍스트) 가 **STT 또는 OCR 에 직접 등장하는지 grep 검증**. v1.9.3 의 형식적 "fact 명시" 통과 → v1.9.4 는 STT 원본과의 매칭 검증 | (a) 단어 1~2개 평가 0건 (b) STT 에 없는 단어 임의 추가 X (`한숨`, `1순위`, `자랑`, `늘려` 등) (c) 시리즈 reference establish 검증 통과 (d) 화자 매칭 검증 통과 (§9.5 v1.9.4) |
+| **7 ★ v1.9.6 NEW** (boost B) | **manual ↔ dialog timeline 1:1 매핑 자동 검증** — `preference == "manual"` 일 때만 작동 | 각 dialog[i] 마다 (a) `dialog[i].text` 가 manual_overlap[i].text 의 정확한 substring 또는 그대로 인지 (curly→straight quote 변형 / 마침표 추가 / 띄어쓰기 보정 등 모두 위반) (b) `abs(dialog[i].start - (manual_overlap[i].start - sub_cut.start)) ≤ 0.3s` (c) 한 칸 shift bug 패턴 (`dialog[i].time = manual_overlap[i+1].time` 패턴) 0건 | (a)·(b)·(c) 모두 통과 |
+| **8 ★ v1.9.6 NEW** (boost D) | **explain 매너리즘 자동 측정** | 자동 측정 + 보고: 1) 도입부 패턴 분포 (1)·(2)·(3)·(4)·(5) % / 2) '미친' / '미쳤' 사용률 / 3) '명대사' 사용률 / 4) 마무리 라인 패턴 분포 (ㄷㄷ / ㅋㅋ 단독 / 명대사 / 미쳤네 / 기타) / 5) 어미 시그니처 ~는데 % (35~50%) / 6) 영상 3등분 분포 (도입/중반/후반 라인 갯수) / 7) 라인 수 vs 영상 길이별 *최소* | (a) 도입부 (1) batch < 30% (단일 영상은 §11 C12 의 3회 연속 X) (b) '미친' < 15% (c) '명대사' < 10% (d) 마무리 단독 ㄷㄷ/ㅋㅋ < 50% (e) 라인 수 ≥ 영상 길이별 *최소* (20~25s 6 / 25~30s 7 / 30~40s 8 / 40s+ 10) (f) ~는데 어미 35~50% |
+| **9 ★ v1.9.6 NEW** (boost A) | **sub_cut.start/end ↔ manual segment 정합 검증** — `preference == "manual"` 일 때만 작동 | 각 sub_cut 마다 (a) sub_cut.start 가 manual segment 한복판 (`manual_seg.start + 0.1 ≤ sub_cut.start ≤ manual_seg.end - 0.1`) 인지 / (b) sub_cut.end 도 동일 / (c) 케이스 분류 (A: 정확 정합 / B: boundary / C: 한복판) + 보정 추천 (보정 A/B) | 위반 0건 또는 보정 적용 후 재검증 통과 |
 
 #### 위반 시 액션 (재작성 의무)
 
@@ -1260,26 +1445,42 @@ sub_cut[5] = 22.0~26.0 (좌중 폭소)
   - (b) STT 에 없는 단어 임의 추가 → STT 에 있는 fact 로 교체 또는 삭제
   - (c) 가짜 시리즈 reference → "X 시리즈" 표현 회피, STT 직접 발화 사용
   - (d) 화자 매칭 잘못 → 일반명사 fallback 또는 라인 삭제 (§9.5 v1.9.4)
+- **7 미달** (★ v1.9.6 NEW)
+  - (a) 텍스트 변형 → manual segment 텍스트 그대로 복원 (curly quote 보존)
+  - (b) 시각 어긋남 (한 칸 shift) → §6.2c v1.9.6 pseudocode 재적용. dialog[i].start = manual_overlap[i].start - sub_cut.start 로 재계산. dialog.srt 재작성.
+  - (c) 케이스 B (sub_cut.start = manual segment boundary) 면 §6.2c v1.9.6 케이스 분석 + sub_cut.start 보정 검토
+- **8 미달** (★ v1.9.6 NEW)
+  - (a) 도입부 (1) batch > 30% → 패턴 (2)~(5) 로 카피 재구성 (영상 평가형 / 명장면 강조형 / 빌드업 강조형 / 펀치 예고형)
+  - (b) '미친' / '명대사' / 단독 ㄷㄷ-ㅋㅋ cap 초과 → 대체 어휘 (죽이는 / 신박한 / 한 줄 정리 / 헐 / 와 등) 사용
+  - (c) 라인 수 < 최소 → 추가 라인 박을 sub_cut 식별 + 라인 추가 의무 (단 §13.5 6번 fact 근거 룰 통과 의무)
+  - (d) ~는데 어미 < 35% 또는 > 50% — 어미 분포 조정
+- **9 미달** (★ v1.9.6 NEW)
+  - (a) 케이스 C (한복판) → §6.1 v1.9.6 보정 A (sub_cut.start = manual_seg.start) 또는 (보정 B, sub_cut.start = manual_seg.end + 0.05) 적용. edit_plan.json 의 sub_cuts[].start/end 재계산.
+  - (b) 케이스 B (boundary) — 직전 segment 음성 확인 후 (보정 A) 채택 검토 (§11 C20)
 
-#### 통과 결과 출력 (★ v1.9.3 — Preview 단계 / 저장 직전 모두)
+#### 통과 결과 출력 (★ v1.9.6 — Preview 단계 / 저장 직전 모두 9 항목)
 
-6 항목 모두 통과하면 사용자에게 **검증 결과 명시**:
+9 항목 모두 통과하면 사용자에게 **검증 결과 명시**:
 
 ```
-✅ §13.5 통합 sync 재검증 통과 (★ v1.9.3 6 항목)
+✅ §13.5 통합 sync 재검증 통과 (★ v1.9.6 9 항목)
    1. timeline align — N라인 모두 ±0.3s 안
    2. frame OCR sample (라인 #1, #N/2, #N) — 모두 텍스트 일치
    3. timeline 통독 시뮬 — 자연스러운 흐름
    4. dialog ↔ STT — N라인 일치 (M라인 OCR 보정)
    5. explain ↔ 컨텍스트 — N라인 매치
    6. ★ explain fact 근거 — N/N 라인 명시 (단어 1~2개 평가 0건)
+   7. ★ v1.9.6 manual ↔ dialog timeline 1:1 — N라인 매핑 통과 (한 칸 shift 0건, curly quote 보존 ✓)  [preference == "manual" 일 때만]
+   8. ★ v1.9.6 explain 매너리즘 측정 — 도입부 (1) batch X% (cap 30%) / '미친' Y% (cap 15%) / '명대사' Z% (cap 10%) / 마무리 단독 ㄷㄷ-ㅋㅋ W% (cap 50%) / ~는데 어미 V% (35~50%) / 라인 수 N개 (영상 길이 X초 → 최소 M개)
+   9. ★ v1.9.6 sub_cut ↔ manual segment 정합 — N개 sub_cut 모두 케이스 A 또는 보정 후 통과 (위반 0건)  [preference == "manual" 일 때만]
 ```
 
 위반 발생 시 어느 항목 어느 라인이 문제였는지 + 보정 내용도 출력 (사용자가 추적 가능하도록).
 
-**핵심 (★ v1.9.3)**:
-- **모드 B-1 Preview 단계** — 6 항목 통과 후 채팅에 preview 출력 (파일 X)
+**핵심 (★ v1.9.6)**:
+- **모드 B-1 Preview 단계** — 9 항목 통과 후 채팅에 preview 출력 (파일 X)
 - **모드 B-2 저장 직전** — 사용자 수정 누적 후 sync 깨졌을 수 있으므로 한 번 더 검증. 통과 못 하면 _READY 박지 X.
+- `preference == "auto"` 또는 `"none"` 케이스: 7번·9번 검증 면제 (manual srt 없음). 1~6 + 8 만 적용.
 
 ---
 
@@ -1326,13 +1527,16 @@ sub_cut[5] = 22.0~26.0 (좌중 폭소)
 🔖 해시태그: #... #... #...
 ⚙️ 출처: <footer.source_text>
 
-✅ §13.5 통합 sync 재검증 6 항목 통과:
+✅ §13.5 통합 sync 재검증 9 항목 통과 (★ v1.9.6):
    1. timeline align — ✓
    2. frame OCR sample — ✓
    3. 통독 시뮬 — ✓
    4. dialog ↔ STT — ✓
    5. explain ↔ 컨텍스트 — ✓
    6. ★ explain fact 근거 — N/N 라인 명시 (단어 1~2개 평가 0건)
+   7. ★ v1.9.6 manual ↔ dialog timeline 1:1 — ✓ [preference == "manual" 일 때만 / 한 칸 shift 0건 / curly quote 보존 ✓]
+   8. ★ v1.9.6 explain 매너리즘 — 도입부 (1) X% / '미친' Y% / 마무리 단독 ㄷㄷ-ㅋㅋ Z% / 라인 수 N개 (최소 M개) ✓
+   9. ★ v1.9.6 sub_cut ↔ manual 정합 — ✓ [preference == "manual" 일 때만]
 
 👉 검수 후 다음 중 하나로 답변:
    • "OK 저장해" / "진행해" → 파일 저장 + _READY (모드 B-2 진입)
@@ -1350,7 +1554,7 @@ sub_cut[5] = 22.0~26.0 (좌중 폭소)
 편집점 폴더: `<data_root>/<영상명>/편집점/<YYMMDD>_<title_for_dir>/`
 
 순서:
-1. **§13.5 저장 직전 재검증** ★ v1.9.3 — preview 후 사용자 수정 누적된 상태에서 sync 깨졌을 수 있음. 6 항목 다시 통과해야 진행.
+1. **§13.5 저장 직전 재검증** ★ v1.9.6 — preview 후 사용자 수정 누적된 상태에서 sync 깨졌을 수 있음. 9 항목 다시 통과해야 진행 (preference == "auto" / "none" 케이스: 1~6 + 8 만).
 2. dialog.srt
 3. explain.srt
 4. edit_plan.json
@@ -1639,6 +1843,45 @@ y=1840~1920 : 출처 footer (검정 배경)
 ✅ "(누가 진지하게 묻는데 타블로 표정 ㅋㅋ)"  ← 화자 분리
 ```
 
+### ★ v1.9.6 — 동사형 행동 표현 화자 매칭 검증 확장 (★ hard rule, boost C)
+
+> **★ 배경**: v1.9.5 9개 영상 audit (본헤이터 EP) — 명시적 매칭 오류 0건이지만 사용자 피드백 "화자 체크 아쉬움" 발생. 원인 추정: **동사형 행동 표현** (`받아치는데`, `토로하는데`, `회상하는데`) 같이 누가 행동하는지 명시 안 한 explain 라인이 모호. v1.9.4 의 §9.5 화자 매칭 검증 룰은 *명사형* "X 본인" 만 다룸. 동사형 행동 explain 의 화자 모호 케이스 검증 X.
+
+**v1.9.6 룰** — 다음 *동사형 행동 표현* 도 v1.9.4 §9.5 화자 매칭 검증과 동일한 face_cluster + STT 흐름 검증 의무:
+
+| 동사형 행동 표현 패턴 | 예시 |
+|---|---|
+| **받아치는데 / 받아치는 / 받아치며** | `(받아치는데 ㅋㅋ)` |
+| **토로하는데 / 토로하며 / 토로 들어가는데** | `(빵집 진상 케이스 토로 들어가는데)` |
+| **회상하는데 / 회상 들어가는데** | `(EPICK 였나 EPIC 였나 헷갈려 회상)` |
+| **항변하는데 / 항변하며** | `(드디어 자기도 마늘 먹을 자유 있다 항변하는데)` |
+| **모방하며 / 흉내내는데 / 따라하는데** | `(타블로 와이프 모방하며 마늘 자유 토로하는데)` |
+| **셋업 들어가는데 / 빌드업하는데** | `(투컷 본인 연예인 서비스 주지 말라 셋업 들어가는데)` |
+| **묻는데 / 답하는데 / 질문하는데** | `(이 질문이 들어오는데)` |
+| **자뻑 / 자수 / 자포자기** | `(본인 발언 자뻑인데)` |
+
+**검증 절차** (코워크가 explain 작성 시):
+
+1. STT segments 중 그 행동 *직전·직후* 발화의 dominant face_cluster_id 확인
+2. 행동 주체와 face cluster 정합하는지 검증 (v1.9.4 §9.5 와 동일 절차)
+3. 정합 안 되면 → **일반명사 fallback** (예: `"X 가 받아치는데"` → `"여기서 받아치는데"` 또는 `"옆에서 한 마디 들어오는데"`)
+
+### ★ v1.9.6 — 동사형 행동 explain 라인 화자 명시화 권장 (★ soft rule, boost C)
+
+> **★ 배경**: v1.9.5 9개 영상 — 동사형 행동 explain 라인 화자 명시 22% (10/45 라인). 영상 안에 화자 2명+ 등장 시 누가 행동 주체인지 dialog 만으로 모호한 케이스 다수.
+
+**v1.9.6 권장**:
+
+| ❌ 모호 | ✅ 명시 |
+|---|---|
+| `(빵집 진상 케이스 토로 들어가는데)` | `(타블로가 빵집 진상 토로 들어가는데)` |
+| `(받아치는데 ㅋㅋ)` | `(타블로 본인 받아치는데 ㅋㅋ)` 또는 `(옆에서 받아치는데 ㅋㅋ)` |
+| `(토로하는데)` | `(투컷 형 토로하는데)` |
+
+**기준**: 영상 안에 화자가 2명+ 등장하고 누가 그 행동을 하는지 dialog 만으로 모호하면 explain 에서 명시화. 단 §9.5 v1.9.4 + v1.9.6 (위 동사형 검증) 통과 시만 (잘못된 화자 명시 = §13.5 6번 fact 검증 위반).
+
+**근거**: 명시 시 시청자 입장 화자 식별 명료 → 채널 시그니처 ↑. 단 face_cluster 검증 못 통과한 추측 명시는 회피 (잘못된 호명 = 채널 신뢰도 ↓).
+
 ### 사용 예시 (★ v1.9.2)
 
 ```
@@ -1849,6 +2092,75 @@ STT 에 없는 단어를 임의로 추가 X. fact 만 사용. 추측은 명시 (
 
 **근거**: 광고감독 채널 매칭 수준 상향 + 사용자 피드백 "explain 너무 적음, 재미·맥락 부족". 단 빈도 ↑ 와 품질 ↑ 동시 적용 의무 (§9.6 fact 근거 룰).
 
+### ★ v1.9.6 — explain 라인 *최소* 갯수 강제 (★ hard rule, boost D)
+
+> **★ 배경**: v1.9.5 9개 영상 audit (본헤이터 EP) — **9/9 영상이 정확히 5개 라인**. 빈도 cap (max 25~35%) 만 정확히 도달 = 코워크의 "5개 cap 안전 패턴" 학습. 영상별 19.2~45.5% 분산 (cap 안에서 minimal).
+
+**v1.9.6 신설** — 영상 길이별 *최소* explain 라인 수 (★ hard):
+
+| 영상 길이 | 최소 explain 라인 | 비고 |
+|---|---|---|
+| 20~25s | **6 라인** | v1.9.5 5 → +1 |
+| 25~30s | **7 라인** | v1.9.5 5 → +2 |
+| 30~40s | **8 라인** | v1.9.5 5 → +3 |
+| 40~60s | **10 라인** | |
+
+**또는 dialog 라인 수 비례** (둘 중 큰 값):
+- 최소 explain 라인 = `max(영상 길이별 최소, dialog 라인 × 0.30)`
+
+**★ 검증** (Preview self-check, §13.5 8번 신설):
+- 라인 수 < 최소 → 빈도 미달 — 추가 라인 박을 sub_cut 식별 + 라인 추가 의무
+
+**근거**: cap (max 25~35%) 의 함정 회피. 안전 패턴 5개로 끝나면 채널 시그니처 X. v1.9.6 부터 *최소* + *최대* (cap) 둘 다 검증.
+
+### ★ v1.9.6 — 도입부 패턴 (1) 사용률 cap (★ hard rule, §11 C12 보강, boost D)
+
+> **★ 배경**: v1.9.5 9개 영상 audit — 도입부 패턴 (1) `(X 들어가는데)` `(X 사연인데)` `(X 토로하는데)` **9/9 사용** (100%) — §11 C12 "3회 연속 X" 9회 연속 위반. 패턴 (2)~(5) 0회. v1.9.3 도입부 패턴 5종 룰 효과 없음.
+
+**v1.9.6 강화 — 한 batch (한 작업 세션의 N 영상 batch) 안 도입부 패턴 분포 강제**:
+
+- 패턴 (1) 인물·상황 압축 사용률 < **30%** 강제 (예: 9 영상 중 max 2~3개만 패턴 (1))
+- 나머지는 패턴 (2)~(5) 의무 배분:
+
+| 패턴 | 의무 비율 | 예시 |
+|---|---|---|
+| **(2) 영상 평가형** | **30%+** | `(이 EP 진심 토로가 미친 게)`, `(이 컷 명장면인데)` |
+| **(3) 명장면 강조형** | **20%+** | `(타블로 코첼라 회상 명장면인데)`, `(역대급 명대사 인정 ㄷㄷ)` |
+| **(4) 빌드업 강조형** + **(5) 펀치 예고형** | **합산 20%+** | `(다음 컷 빌드업 미친 게)`, `(이 답변이 펀치 라인인데)` |
+
+**★ 검증** (Preview self-check, §13.5 8번 신설):
+- batch 작업 시 도입부 패턴 분포 자동 측정 + (1) 비율 > 30% 시 추가 작성 요청
+- batch 가 단일 영상이면 그 영상의 도입부 패턴 = (2)~(5) 중 하나 권장 (단 §11 C12 의 "3회 연속 X" 그대로 적용)
+
+**근거**: 한 batch 안 같은 패턴 100% = 매너리즘. 채널 시그니처 살리려면 영상별 다른 도입부 호흡.
+
+### ★ v1.9.6 — 매너리즘 어휘 cap (★ soft rule, boost D)
+
+> **★ 배경**: v1.9.5 9개 영상 — '미친' / '미쳤' 카피 사용률 24% (4 라인 중 1), 마무리 라인 'ㄷㄷ' / 'ㅋㅋ' 단독 마무리 80%. black list 는 아니지만 매너리즘.
+
+**v1.9.6 권장 cap**:
+
+| 어휘 | cap (한 영상 안 사용률) | v1.9.5 audit |
+|---|---|---|
+| **'미친' / '미쳤'** | < **15%** | 24% (★ cap 초과) |
+| **'명대사'** | < **10%** | (간헐 사용) |
+| **'ㄷㄷ' / 'ㅋㅋ' 단독 마무리** | < **50%** | 80% (★ cap 초과) |
+
+**대체 권장 어휘**:
+
+| 매너리즘 어휘 | 대체 권장 |
+|---|---|
+| 미친 → | 죽이는 / 신박한 / 압도적 / 절묘한 / 답이 없는 / 한 끗 |
+| 명대사 → | 한 줄 정리 / 정점 / 클라이맥스 / 한 마디 / 펀치 라인 |
+| ㄷㄷ 단독 → | 헐 / 와 / 핵 / 진짜 (단독 X, fact 와 함께) |
+| ㅋㅋ 단독 → | (앞에 fact + ㅋㅋ) — 단독 회피 |
+
+**★ 검증** (Preview self-check, §13.5 8번 신설):
+- '미친' / '명대사' 사용률 측정 + cap 초과 시 다양화 권장
+- 마무리 라인 단독 'ㄷㄷ' / 'ㅋㅋ' 카운트 + cap 초과 시 fact 추가 또는 어휘 다양화
+
+**근거**: black list 룰 (좌중·사이클·디테일 등) 으로 해결 안 되는 *frequency-based* 매너리즘. 어휘 자체는 자연스러운 20대 여성 일상어이지만 과도 사용 시 채널 매너리즘 → 시청자 입장 단조로움.
+
 ## §9.7 — [follow:N] 마커 활성화 (v1.3 NEW)
 
 v1.3 부터 **face_clusters 의 cluster_id 자동 채워짐** (Simple IoU 클러스터링) → explain.srt 의 `[follow:N]` 마커가 실제 동작 (얼굴 따라다니는 자막).
@@ -1898,6 +2210,8 @@ v1.3 부터 **face_clusters 의 cluster_id 자동 채워짐** (Simple IoU 클러
 | C16 ★ v1.9.4 | §13.5 6번 **fact STT grep 검증 (hard)** vs **explain 빈도 25~35%** | **fact 검증 우선** — 빈도 못 채워도 STT 에 근거 없는 카피 박지 X. 빈도 미달 OK | v1.9.3 결과물 fact 부정확률 44% — 빈도 ↑ 와 품질 ↑ 충돌 시 품질 |
 | C17 ★ v1.9.5 | §6.2c **manual srt 텍스트 (hard)** vs **STT 텍스트** | **manual srt 우선** — 사람이 박은 정답이 ground truth. 검열 패턴 (`이C...`)·화자 겹침 슬래시·강조 (`너~무`) 그대로 보존. STT 는 word-level timing + 비언어 (`(웃음)` 등) 보강용 | manual = 채널 시그니처 + 100% 정확. STT = 보조 |
 | C18 ★ v1.9.5 | §6.2c `preference == "manual"` 일 때 **§6.2b OCR 우선 작동 X** vs **§6.2b 의 모든 sub_cut OCR 비교 의무 (v1.7)** | **manual 케이스에선 §6.2b 작동 X** (dialog 텍스트는 manual 고정, OCR 보강 불필요). OCR 결과는 §9-pre / §10 reference 만 활용. v1.7 self-check 도 manual 케이스 면제 | manual 이 ground truth 라 OCR 비교 의미 ↓. 자동 편집 시간 + 코워크 검증 단계 절약 |
+| C19 ★ v1.9.6 | §9.6 **도입부 패턴 (1) batch 사용률 < 30% 강제** vs **자연 발화 흐름** | **분포 강제 우선** — 한 batch 안 패턴 (1) 사용률 30% cap. 자연 발화 흐름이 패턴 (1) 만 유도하면 패턴 (2)~(5) 로 카피 재구성 의무 | 매너리즘 회피가 채널 시그니처 핵심. v1.9.5 9/9 (100%) 위반 → 강제 룰로 격상 |
+| C20 ★ v1.9.6 | §6.2c **manual srt timeline 매핑 (1:1)** vs **sub_cut 직전 segment 음성 보존** | **manual segment.start 기준 sub_cut.start 보정 (A) 우선** — 직전 segment 음성도 sub_cut 안에 들리면 sub_cut.start = manual_seg[N-1].start 까지 확장. 음성 보존 + 매핑 정합성 동시 달성 | 케이스 B (sub_cut.start = manual segment boundary) 가 shift bug 의 hot spot. 보정 A 채택 시 한 칸 shift 회피 + 음성 자연스러움 동시 |
 
 ## 일반 우선순위 (★ 위 표 외 케이스)
 
@@ -1921,6 +2235,7 @@ v1.3 부터 **face_clusters 의 cluster_id 자동 채워짐** (Simple IoU 클러
 # 변경 이력
 | 버전 | 날짜 | 변경 |
 |------|------|------|
+| v1.9.6 | 2026-05-09 | v1.9.5 9개 영상 audit (본헤이터 EP) 기반 5가지 패치 — **(A) §6.2c manual srt timeline 매핑 알고리즘 명시화** dialog[i] = manual_overlap[i] 1:1 매핑 강제. 한 칸 shift bug fix. sub_cut.start 가 manual segment.end 케이스 처리 룰 신설 (보정 A/B). manual 텍스트 변형 금지 항목 강화 (curly quote 보존 등). 9개 영상 중 3개 (33%) shift bug 발생 fix / **(B) §6.1 sub_cut boundary 보강** preference == "manual" 일 때 manual srt segments 에도 §6.1 v1.9 보정 룰 적용. sub_cut 분할 cargo cult 회피 — 영상 길이별 최소 sub_cut 갯수 강제 (20s+ 최소 2 / 30s+ 최소 3 / 45s+ 최소 4). scene_cut 3개+ 내장 sub_cut 분할 안 했으면 의도 명시 의무. 9개 영상 중 8개 (89%) start segment 한복판 위반 fix / **(C) §9.5 화자 매칭 검증 확장** 동사형 행동 표현 (받아치는데/토로하는데/회상하는데 등) 도 face_cluster + STT 검증 의무 / **(D) §9.6 explain 매너리즘 회피** explain 라인 *최소* 갯수 강제 (cap 의 함정 회피, 9개 영상 모두 정확 5개 → 영상 길이별 6~10 최소). 도입부 패턴 (1) 사용률 cap < 30% (현재 100%). 매너리즘 어휘 cap ('미친' < 15%). few-shot 예시 30~50개 직접 박음 / **(E) §13.5 Preview self-check 7~8~9번 추가** manual ↔ dialog timeline 자동 검증 + explain 매너리즘 자동 측정 + sub_cut.start/end manual 정합 검증 + §11 C19·C20 추가. 상세는 ~/showdon/analysis/v1.9_yejja/v1.9.6_diagnosis_v1.0.md 참조 |
 | v1.9.5 | 2026-05-09 | yt-dlp manual 자막 도입 — STT 텍스트 정확도 ~85% → manual 자막 ~99%+ 회복. 4가지 변경 — **(A) §6.2c 신설 ★ 가장 큰 변경** — `transcript_source.json` 의 `preference` 필드 분기. `manual` 이면 dialog 텍스트는 manual srt ground truth (STT 무시) / timing·비언어는 STT word-level 보강 (하이브리드). `auto`·`none` 이면 v1.9.4 흐름 그대로 / **(B) §6.2b OCR 우선 룰 분기** — `preference == "manual"` 일 때 §6.2b 작동 X. OCR 결과는 §9-pre 영상 흐름 표 + §10 제목 매치 reference 로만 활용 (dialog 보강 X). manual srt 가 dialog 의 정답이라 OCR 비교 불필요 + 자동 편집 시간 절약 / **(C) §6.2b STT 오인식 보정 룰 (v1.9.4) 분기** — `preference == "manual"` 일 때 작동 X (manual 텍스트가 ground truth, 자체 보정 불필요). manual 자체가 의심스러우면 사용자에게 보고 (코워크 의역 X) / **(D) §11 C17·C18 추가** (manual 텍스트 vs STT / `preference == "manual"` 일 때 §6.2b 작동 X) — backend 동시 변경: schema.py 에 TranscriptSourceJson dataclass 신설 / analyze.py 에 _detect_and_copy_transcripts() + step 1b 추가 / showdon-downloader 의 ydl_opts 에 자막 옵션 + writeinfojson 추가. 효과: STT 오인식 자동 정정 (`늘려/낼름` 등 v1.9.4 보정 룰 자동 해결) + 비속어 검열 자동 (채널 시그니처 보존) + 화자 겹침 슬래시 (`/`) 자동 + 처리 시간 ↓ (3시간 영상 STT skip 가능성 검토 중). 본헤이터 EP PoC 통과 (manual ko + en 둘 다 있음, 1219 segments). 상세 ~/showdon/analysis/v1.9_yejja/v1.9.5_manual_srt_도입_v1.0.md (작성 예정) |
 | v1.9.4 | 2026-05-09 | v1.9.3 본헤이터 EP 5 결과물 검증 (사용자 피드백 12개 + STT 원본 grep 재검증) 기반 5가지 패치 — **(A) §9.6 정체성 박스 ★ 20대 여성 편집자 톤** white/black list 표 신설. White: `~네`, `~잖아요`, `~던데`, `~더라고`, `~봤어요`, `왜케`, `완전`, `진짜`, `완전체`, `갑자기`, `어쨌든`, `근데` / Black: 좌중·사이클·디테일·완성도·케미·연출이 살아있·편집팀이 잘·타이밍 미쳤·자막 분석 카피·매너리즘 표현 / **(B) §9.6 카피 작성 룰 4종 신설** — 룰 1 (자막 분석 X — 자막에 박힌 단어 그대로 평가하는 카피 절대 X), 룰 2 (남의 채널 편집팀 칭찬 X — "편집팀이 잘 살린", "타이밍 미쳤" 같은 메타 코멘트 X), 룰 3 (약한 추측 회피 — "~인 것 같은", "~하지 않을까", "~할지도" 빼고 단정 못 하면 카피 빼기), 룰 4 (시리즈 reference 검증 — "X 시리즈에 Y 추가" 박을 때 영상에서 X 가 실제로 언급/시청자 공유 fact 인지 확인) / **(C) §9.5 화자 매칭 검증 ★ hard rule** — "X 본인", "Y 가 직접" 같이 인물 명시한 explain 박을 때 STT speaker_id + face_clusters dominant 일치하는지 한 번 더 확인 의무. 추측 화자 명시 X / **(D) §6.2b STT 오인식 보정 의무 ★ NEW** — 동음/유사 발음 (예 `늘려/낼름`, `밉도/밑도`) 문맥 안 맞으면 STT 원본 + OCR 재대조 + 한국어 일상어 보정. 의심 단어 그대로 박지 X / **(E) §13.5 6번 항목 강화** — 형식적 fact 명시 → STT 원본 grep 검증 (`grep -i "키워드" *.srt` 로 실제 발화/시청자 fact 인지 확인). 빈도 못 채워도 fact 근거 없는 카피 빼기 + §11 충돌 결정 표 C15 (white/black list vs 자연 발화), C16 (fact 검증 vs 빈도) 추가. 상세 분석은 ~/showdon/analysis/v1.9_yejja/v1.9.3_본헤이터_결과물_분석_v2.0.md 참조 |
 | v1.9.3 | 2026-05-08 | v1.9.2 결과물 5개 분석 + 사용자 피드백 ("explain 재미·맥락 부족, 빈도 적음") 기반 8가지 패치 — **(A) §9-pre 영상 흐름 표 명시 의무** (sub_cut별 "구체 디테일" 컬럼, fact 근거 source) / **(B) §9.6 explain fact 근거 의무 (★ hard rule)** — 모든 explain = `(구체 fact) (평가/감상)` 구조, 단어 1~2개 평가 (`(미친)`, `(빌드업 ㅋㅋ)`) 절대 금지 / **(C) §9.6 도입부 패턴 5종 신설** (인물·상황 압축 / 영상 평가형 / 명장면 강조형 / 빌드업 강조형 / 펀치 예고형) + 한 채널 안 같은 패턴 3회 연속 X / **(D) §9.6 시점별 톤 차별화** (도입·셋업·펀치·반응·마무리 5 시점) / **(E) §9.6 빈도 상향** 광고감독 채널 매칭 — 재미 5~10% → 25~35%, 정보·공감 8~12% → 30~40%, 감동 3~7% → 15~22%, max 트림 15% → 50% / **(F) §6.2 화자 겹침 처리 NEW** — 짧은 (< 1.5s) 슬래시 한 라인 `(A) ... / (B) ...` / 긴 (≥ 1.5s) 분할 entry / **(G) §13.5 6 항목 확장** — NEW 6번 항목: explain 라인 fact 근거 명시 검증 / **(H) 모드 B 분리 ★ 가장 큰 변경** — B-1 (Preview, 채팅 출력만) + B-2 (사용자 OK 후 파일 저장). Preview 출력 형식 (영상 흐름 표 + 제목 + dialog 요약 + explain 전체 + sync 검증 결과). §13.5 두 번 검증 (Preview 단계 + 저장 직전). 분기 가이드 표 갱신 — backend 변경 X (system prompt 단독). 상세 분석은 ~/showdon/v1.9.2_결과물_분석_v1.0.md 참조 |
