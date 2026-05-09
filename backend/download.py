@@ -319,6 +319,18 @@ def download_video(
         "noprogress": True,
         "progress_hooks": [_make_progress_hook(on_progress, is_cancelled, url, title)],
         "overwrites": overwrite,
+        # ★ v1.9.5 — 자막 다운로드 (analyze.py 의 _detect_and_copy_transcripts 가 활용).
+        # manual 우선, 없으면 auto fallback. ko (dialog ground truth) + en (해외 reference).
+        # info.json = manual/auto 구별 메타 (필수).
+        "writesubtitles": True,
+        "writeautomaticsub": True,
+        "subtitleslangs": ["ko", "en"],
+        "subtitlesformat": "srt/vtt/best",
+        "postprocessors": [{
+            "key": "FFmpegSubtitlesConvertor",
+            "format": "srt",
+        }],
+        "writeinfojson": True,
     }
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
