@@ -1,4 +1,4 @@
-# Quick-Reference 체크리스트 (★ v1.9.1 NEW — 작성 시 항상 참조 / ★ v1.9.5 manual srt 우선순위 추가 / ★ v1.9.6 manual srt timeline 매핑 + sub_cut 분할 cargo cult fix / ★ v1.9.7 explain 룰 전면 재구성 — TV 예능 자막 narration 형)
+# Quick-Reference 체크리스트 (★ v1.9.1 NEW — 작성 시 항상 참조 / ★ v1.9.5 manual srt 우선순위 추가 / ★ v1.9.6 manual srt timeline 매핑 + sub_cut 분할 cargo cult fix / ★ v1.9.7 explain 룰 전면 재구성 — TV 예능 자막 narration 형 / ★ v1.9.8 — @ 비율 ceiling 추가, drift 회피)
 
 > v1.9 의 self-check 19개 / 강제 룰 폭증 → cognitive load 위험.
 > 이 체크리스트는 **작성 마치고 출력 직전 1-page 만 순회** 하는 용도.
@@ -11,7 +11,7 @@
 - [ ] selection_reason 에 셋업~펀치~여운 자연 호흡 사이클 명시 (§9.3)
 - [ ] 떡밥 패턴 (영상에서 안 풀림) 회피 (§10)
 
-## 모드 B-1 Preview 작성 — 출력 직전 체크 (★ v1.9.7 hard rule 17개 + ★ v1.9.7 explain 룰 통째 교체)
+## 모드 B-1 Preview 작성 — 출력 직전 체크 (★ v1.9.7 hard rule 17개 + ★ v1.9.8 @ ceiling 추가)
 
 ### Hard rule (위반 시 Preview 출력 X — 무조건 재작성)
 
@@ -26,7 +26,7 @@
 - [ ] **§13.5 통합 sync 재검증 9 항목** (★ v1.9.3 Preview/저장 + ★ v1.9.7 explain Family 검증) — timeline align / frame OCR / 통독 시뮬 / STT 비교 / explain 컨텍스트 / fact STT grep / manual 매핑 / **★ v1.9.7 explain Family 1/3/4/6 합산 70%+ / @ 검열 ≥ 1회 / Hold ≥ 1회** / sub_cut 정합
 - [ ] **★ v1.9.3 §9-pre 영상 흐름 표 작성** — 명시적 표 + 구체 디테일 컬럼. Preview 출력에 포함 의무
 - [ ] **★ v1.9.7 §9 explain TV 예능 자막 narration** — `~는데/~인데` 어미 0회 hard rule / 리뷰어 평가 어휘 (`명장면` `압권` `미친` `명대사` `빌드업`) 0회 hard rule / Family 1 (X중..) + Family 3 (의태어) + Family 4 (감정+@) + Family 6 (부호) 합산 70%+
-- [ ] **★ v1.9.7 §9 검열 시그니처 의무** — 영상 안 explain 라인 중 **@ / ㅇ삽입 / 자음 분리** 최소 1회 출현 (`(행@복)` `(스ㅇ윽..)` `[ㄷ ㄷ;;]` 등). 큐레이터 정체성 maintenance
+- [ ] **★ v1.9.8 §9 검열 시그니처 균형** — @ 검열 영상당 **() 의 0~50%** 권장 (데이터 평균 30%). **60%+ 매너리즘 위반 hard rule**. `(스ㅇ윽..)` 같은 ㅇ삽입 / `[ㄷ ㄷ;;]` 자음 분리도 검열 family 로 카운트. Non-@ family (Family 1 X중 / Family 3 의태어 / Family 6 부호 only) 우선 사용
 - [ ] **★ v1.9.7 §9 Hold 룰** — 같은 caption 2~4 frames hold 최소 1회 (1792 () 중 492회 paren_hold = 최다 type. narrative 강조 시그니처)
 - [ ] **★ v1.9.7 §9 시그니처 caption library 재사용** — 영상당 최소 1회 motif 풀에서 재사용 (예: `(스ㅇ윽..)` 31x / `(저벅저벅..)` 17x / `(주섬주섬..)` 16x / `(행@복)` 10x / `(?????)` 10x — 130개 motif pool)
 - [ ] **★ v1.9.6 §6.2c manual ↔ dialog timeline 1:1 매핑 자동 검증** (★ hard rule 16) — `preference == "manual"` 일 때 dialog[i] = manual_overlap[i] 1:1 매핑. dialog[i].text 는 manual segment 텍스트 그대로 (curly→straight quote / 마침표 추가 / 띄어쓰기 보정 등 모두 X). dialog[i].start = manual_seg.start - sub_cut.start (clamp). 한 칸 shift bug 회피
@@ -1078,7 +1078,7 @@ sub_cut[2] = 62.5~64.0 (1.5초)
 "(예상치 못한 진심)"          ← 셋업 → 펀치
 ```
 
-**9. explain.srt 작성** ★ v1.9.7 정체성 전면 재구성 — TV 예능 자막 narration 형 큐레이터:
+**9. explain.srt 작성** ★ v1.9.7 정체성 전면 재구성 — TV 예능 자막 narration 형 큐레이터 (★ v1.9.8 — @ 비율 ceiling 추가, drift 회피):
 
 > **★ v1.9.7 정체성 전환 — 234 reference shorts 분석 결과 적용**
 >
@@ -1097,7 +1097,7 @@ sub_cut[2] = 62.5~64.0 (1.5초)
 - 인물 액션·상황을 객관 narration (3인칭 시점)
 - 명사형 / 의태어 / 부호 (`..` `;;` `??` etc.) 압축
 - 큐레이터의 시그니처 caption library (130개 motif pool — `(스ㅇ윽..)` 31x 등) 영상 간 재사용
-- 모드 토글 비유 (X ON / X OFF) / 검열 시그니처 (@ / ㅇ삽입)
+- 모드 토글 비유 (X ON / X OFF) / 검열 시그니처 (@ / ㅇ삽입) — **영상당 () 의 0~50% 권장, 60%+ 매너리즘 위반** (★ v1.9.8 데이터 평균 30%)
 - Hold 강조 (같은 caption 2~4 frames)
 
 **금지 (v1.9.6 매너리즘) ❌**
@@ -1238,7 +1238,17 @@ sub_cut[2] = 62.5~64.0 (1.5초)
 | **자음만 분리** | `[ㄷ ㄷ;;]` `[ㅈ ㅈ ㅈ]` `(W W W W)` — 외침/떨림 |
 | **#%@&*$ 효과음** | `으아 #%@&*$!!!!` — 격한 욕 |
 
-**★ 룰**: 한 영상에 **최소 1~3회 @ 시그니처** 박는 게 패턴 (큐레이터 정체성 maintenance) — **hard rule**
+**★ 룰 (v1.9.8 강화)**:
+- 한 영상에 @ 시그니처 영상당 () 의 **0~50% 권장** (데이터 평균 **30%**, mode **0~9%**)
+- **60%+ 매너리즘 위반 (hard rule)** — 234 영상 중 18% (43개) 만 60%+ 의도적 dense. 대부분 영상은 30~40%
+- **0 영상도 OK** — 62 영상 (26%) 이 @ 0~9%. (스ㅇ윽..) 같은 ㅇ삽입 / 자음 분리 만으로 검열 정체성 충족 가능
+- **Non-@ family 우선 권장 사용 순서**:
+  1. Family 1 (X중..) — `(준비중..)` `(회상중..)`
+  2. Family 3 의태어 (ㅇ삽입 변형 포함) — `(스ㅇ윽..)` `(저벅저벅..)`
+  3. Family 6 부호 only — `(?????)` `(ㄷㄷ..)`
+  4. Family 2 X ON — `(스프링쿨러 ON)` (X 부분에 @ 안 박는 게 정상)
+  5. @ 결합 (Family 4·5·7) — 정서 핵심 punch frame 에만 강조용
+- ㅇ삽입 (`(스ㅇ윽..)` 등) 은 @ 비율 카운트에 **포함 X** (별도 검열 family). 단 ㅇ삽입 + @ 합산 비율이 70%+ 면 매너리즘 위반
 
 ##### Family 8. xN / Counter family ★★
 
@@ -1551,7 +1561,7 @@ sub_cut[6] = 26.0~30.0 (마무리)
 | **시점** | 1인칭 큐레이터 평가/감상 | 3인칭 객관 narration |
 | **시청자 호명** | "끝까지 보세요" 허용 | 시청자 호명 X. 큐레이터 narration 자족 |
 | **빈도** | 영상 길이 무관 dialog 와 비슷 | §9.2 길이별 권장 (5~16개) |
-| **검열 시그니처** | 룰 없음 | @ / ㅇ삽입 / 자음 분리 — 최소 1회 의무 |
+| **검열 시그니처** | 룰 없음 | @ / ㅇ삽입 / 자음 분리 — 0~50% 권장 (★ v1.9.8 ceiling), 60%+ 매너리즘 hard fail |
 | **Hold** | 룰 없음 | 같은 caption 2~4 frames — 최소 1회 |
 | **Caption library** | 룰 없음 | 130개 시그니처 motif 풀 재사용 권장 |
 | **검증 기준** | 리뷰어 카테고리 50%+ | Family 1/3/4/6 합산 70%+ |
@@ -1575,7 +1585,7 @@ sub_cut[6] = 26.0~30.0 (마무리)
 
 #### 9.14 v1.9.7 한 줄 정체성
 
-> **TV 예능 자막 narration 형 — 객관 + 짧은 명사형 + 의성어·의태어 + 모드 토글 (ON/OFF) + @ 검열 시그니처 + Hold 강조. 시그니처 caption library (130개 motif pool) 영상 간 재사용.**
+> **TV 예능 자막 narration 형 — 객관 + 짧은 명사형 + 의성어·의태어 + 모드 토글 (ON/OFF) + 검열 시그니처 (@ 비율 0~50% 균형) + Hold 강조. 시그니처 caption library (130개 motif pool) 영상 간 재사용.** (★ v1.9.8 — @ ceiling 60%, drift 회피)
 
 #### 9.5 인물 호칭 — v1.9.7 폐지 (★ v1.9.7 — 234 영상 데이터 거의 X)
 
@@ -1846,7 +1856,7 @@ v1.9.6 의 톤별 5~12% 등장 빈도 룰은 v1.9.7 §9.2 빈도 표 + §9.6 Pos
 | 5 | explain 라인 ↔ 그 시각 dialog/STT 컨텍스트 일치 | explain `(스ㅇ윽..)` `(?????)` 등 의태어/부호 → 그 시각 인물 동작/표정 frame OCR 매치. 발화 의태어 (`(꿀@꺽)` 등) → STT 음 매치 | 컨텍스트 매치 또는 explain 라인 삭제 |
 | **6 ★ v1.9.7 강화** | **explain Family 시스템 검증 — v1.9.7 §9.4 Family 매핑 검증** | 모든 () explain 라인이 §9.4 12 Family 중 어느 family 에 속하는지 + 그 family 의 형식 공식 따랐는지 검증. v1.9.6 fact 근거 룰 (`(미친)` 평가 어휘) 폐기 | (a) `~는데/~인데` 어미 0건 hard rule (b) 리뷰어 평가 어휘 (`명장면` `압권` `미친` `명대사` `빌드업`) 0건 hard rule (c) Family 1/3/4/6 합산 70%+ (d) Family 7 (@ 검열) 영상당 ≥ 1회 (e) Family 9 (Hold) 영상당 ≥ 1회 (f) 시그니처 caption library 재사용 ≥ 1회 |
 | **7 ★ v1.9.6 NEW** (boost B) | **manual ↔ dialog timeline 1:1 매핑 자동 검증** — `preference == "manual"` 일 때만 작동 | 각 dialog[i] 마다 (a) `dialog[i].text` 가 manual_overlap[i].text 의 정확한 substring 또는 그대로 인지 (curly→straight quote 변형 / 마침표 추가 / 띄어쓰기 보정 등 모두 위반) (b) `abs(dialog[i].start - (manual_overlap[i].start - sub_cut.start)) ≤ 0.3s` (c) 한 칸 shift bug 패턴 (`dialog[i].time = manual_overlap[i+1].time` 패턴) 0건 | (a)·(b)·(c) 모두 통과 |
-| **8 ★ v1.9.7 NEW** (Family 분포 측정) | **explain Family 분포 자동 측정 — TV 예능 자막 narration 형 검증** | 자동 측정 + 보고: 1) Family 1~12 분포 % / 2) `~는데/~인데` 어미 등장 회수 (목표 0) / 3) 리뷰어 평가 어휘 (`명장면` `압권` `미친`) 등장 회수 (목표 0) / 4) 길이 분포 (1~2자 / 3~5자 / 6~10자 / 11+자 비중) / 5) @ 검열 회수 / 6) Hold 회수 / 7) 시그니처 motif 풀 재사용 회수 / 8) 라인 수 vs §9.2 권장 | (a) `~는데/~인데` 0 hard rule (b) 평가 어휘 0 hard rule (c) Family 1/3/4/6 합산 70%+ (d) 길이 1~5자 75%+ (e) @ 검열 ≥ 1회 (f) Hold ≥ 1회 (g) 시그니처 motif 재사용 ≥ 1회 (h) 라인 수 영상 길이별 §9.2 권장 범위 |
+| **8 ★ v1.9.8 강화** (Family 분포 + @ ceiling) | **explain Family 분포 자동 측정 — TV 예능 자막 narration 형 검증** | 자동 측정 + 보고: 1) Family 1~12 분포 % / 2) `~는데/~인데` 어미 등장 회수 (목표 0) / 3) 리뷰어 평가 어휘 등장 회수 (목표 0) / 4) 길이 분포 / 5) @ 검열 비율 (★ v1.9.8 추가 — 0~50% 권장) / 6) Hold 회수 / 7) 시그니처 motif 풀 재사용 회수 / 8) 라인 수 vs §9.2 | (a) `~는데/~인데` 0 hard rule (b) 평가 어휘 0 hard rule (c) Family 1/3/4/6 합산 70%+ (d) 길이 1~5자 75%+ (e) ★ v1.9.8 — @ 비율 < 60% hard rule (50%+ warning) (f) Hold ≥ 1회 (g) 시그니처 motif 재사용 ≥ 1회 (h) 라인 수 §9.2 권장 |
 | **9 ★ v1.9.6 NEW** (boost A) | **sub_cut.start/end ↔ manual segment 정합 검증** — `preference == "manual"` 일 때만 작동 | 각 sub_cut 마다 (a) sub_cut.start 가 manual segment 한복판 (`manual_seg.start + 0.1 ≤ sub_cut.start ≤ manual_seg.end - 0.1`) 인지 / (b) sub_cut.end 도 동일 / (c) 케이스 분류 (A: 정확 정합 / B: boundary / C: 한복판) + 보정 추천 (보정 A/B) | 위반 0건 또는 보정 적용 후 재검증 통과 |
 
 #### 위반 시 액션 (재작성 의무)
@@ -1869,7 +1879,7 @@ v1.9.6 의 톤별 5~12% 등장 빈도 룰은 v1.9.7 §9.2 빈도 표 + §9.6 Pos
   - (b) 리뷰어 평가 어휘 (`명장면` `압권` `미친` `명대사` `빌드업`) 등장 → 통째 삭제 또는 Family 어휘로 재작성
   - (c) Family 1/3/4/6 합산 < 70% → 의태어/X중/감정명사/부호로 라인 추가 또는 교체
   - (d) 길이 1~5자 < 75% → 긴 라인을 시그니처 motif 풀에서 짧은 caption 으로 교체
-  - (e) @ 검열 0회 → 한 라인 이상에 @ 추가 (Family 7 룰)
+  - (e) ★ v1.9.8 — @ 비율 60%+ → 일부 @ 라인을 non-@ family 로 교체 (Family 1 X중 / Family 3 의태어 / Family 6 부호 only / Family 2 X ON). 50~60% 도 1~2개 교체 권장
   - (f) Hold 0회 → 클라이맥스 sub_cut 에 동일 caption 2~4 frames hold 추가
   - (g) 시그니처 motif 재사용 0회 → §9.5 caption library 에서 영상 visual context 와 일치하는 motif 1개 박기
   - (h) 라인 수 < 권장 → §9.2 빈도 표 기준으로 라인 추가
@@ -1890,7 +1900,7 @@ v1.9.6 의 톤별 5~12% 등장 빈도 룰은 v1.9.7 §9.2 빈도 표 + §9.6 Pos
    5. explain ↔ 컨텍스트 — N라인 매치
    6. ★ explain fact 근거 — N/N 라인 명시 (단어 1~2개 평가 0건)
    7. ★ v1.9.6 manual ↔ dialog timeline 1:1 — N라인 매핑 통과 (한 칸 shift 0건, curly quote 보존 ✓)  [preference == "manual" 일 때만]
-   8. ★ v1.9.7 explain Family 분포 — Family 1/3/4/6 합산 X% (70%+) / `~는데/~인데` 어미 V개 (0) / 평가 어휘 W개 (0) / 길이 1~5자 Y% (75%+) / @ 검열 Z회 / Hold N회 / 시그니처 motif 재사용 M회 / 라인 수 K개 (영상 길이 P초 → 권장 §9.2)
+   8. ★ v1.9.8 explain Family 분포 — Family 1/3/4/6 합산 X% (70%+) / `~는데/~인데` 어미 V개 (0) / 평가 어휘 W개 (0) / 길이 1~5자 Y% (75%+) / ★ @ 비율 R% (cap 60%, 0~50% 권장) / Hold N회 / 시그니처 motif 재사용 M회 / 라인 수 K개 (영상 길이 P초 → 권장 §9.2)
    9. ★ v1.9.6 sub_cut ↔ manual segment 정합 — N개 sub_cut 모두 케이스 A 또는 보정 후 통과 (위반 0건)  [preference == "manual" 일 때만]
 ```
 
