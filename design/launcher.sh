@@ -30,6 +30,9 @@ echo "[launcher] PYTHON=$PYTHON"
 echo "[launcher] PATH=$PATH"
 which ffmpeg 2>&1 | sed 's/^/[launcher] which ffmpeg: /'
 which ffprobe 2>&1 | sed 's/^/[launcher] which ffprobe: /'
+# ★ deno — yt-dlp 의 YouTube JS 챌린지 (cipher) 해결에 필수. 없으면 다운로드 시
+# "Requested format is not available" 발생 (showdon-downloader v0.4.4 와 동일).
+which deno 2>&1 | sed 's/^/[launcher] which deno: /'
 
 # 1) 설치 여부 확인
 if [ ! -x "$PYTHON" ]; then

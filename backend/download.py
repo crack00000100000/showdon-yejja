@@ -23,10 +23,25 @@ from typing import Any, Callable, Literal, Optional
 
 from .filename import build_filename
 from .schema import SourceMeta, save_dataclass
+from .ytdlp_cookies import CookieBrowserPicker
 
 
-# CLAUDE.md QuickTime 호환 — H.264/AAC 통합 mp4 우선
-_FORMAT_PREFERENCE = "(bv*[vcodec*=avc]+ba[ext=m4a]/b[ext=mp4]/bv*+ba/b)"
+# CLAUDE.md QuickTime 호환 — H.264/AAC 통합 mp4 우선.
+# ★ showdon-downloader v0.4.x 와 동일한 5단 fallback. AVC1/M4A → mp4 → 통합mp4 →
+# 임의(VP9/AV1 가능) → best. macOS QuickTime 은 mp4 안 VP9/AV1 디코딩 못 함 →
+# 4번 fallback 까지 떨어지면 음성만 나올 수 있음 (VLC 권장). 다운로드 실패보단
+# 받아지는 게 우선.
+_FORMAT_PREFERENCE = (
+    "bv*[vcodec*=avc]+ba[ext=m4a]/"
+    "bv*[ext=mp4]+ba[ext=m4a]/"
+    "b[ext=mp4]/"
+    "bv*+ba/"
+    "best"
+)
+# ★ mp4 단일 → mp4/webm/mkv 다중 허용. YouTube 가 일부 영상 (특히 짧은 해외 쇼츠)
+# 은 VP9+Opus (webm) 만 제공 → mp4 만 허용하면 yt-dlp 가 호환 체크에서 거부 →
+# "Requested format is not available". webm/mkv 허용으로 회피.
+_MERGE_OUTPUT_FORMAT = "mp4/webm/mkv"
 
 # yt-dlp 가 _speed_str/_eta_str 에 박는 ANSI 컬러 escape 제거용
 _ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
@@ -94,40 +109,64 @@ class DownloadCancelled(Exception):
 # 메타데이터 추출 (다운로드 없이)
 # =============================================================================
 
-def fetch_metadata(url: str, *, extract_flat: bool = False) -> dict:
+def fetch_metadata(
+    url: str,
+    *,
+    extract_flat: bool = False,
+    picker: Optional["CookieBrowserPicker"] = None,
+) -> dict:
     """yt-dlp 로 영상 메타만 추출. 다운로드 X.
 
     Args:
         url: 영상 URL (단일 또는 플레이리스트)
         extract_flat: True 면 플레이리스트 entries 의 풀 메타 빼고 entry id 만.
             플레이리스트 펼치기 빠르게.
+        picker: 호출 측에서 공유하는 CookieBrowserPicker. 없으면 새로 생성.
+            여러 호출에 같은 picker 를 넘기면 성공한 브라우저가 캐시되어 빠름.
 
     Returns:
         yt-dlp info dict. 플레이리스트면 _type='playlist' + 'entries' 키 포함.
+
+    ★ YouTube 봇 감지 + EJS opt-in + cookies fallback 자동 처리 (showdon-downloader
+    v0.4.0~0.4.7 와 동일 패턴).
     """
     import yt_dlp  # lazy
-    opts = {
+    base_opts = {
         "skip_download": True,
         "quiet": True,
         "no_warnings": True,
         "no_color": True,
         "extract_flat": extract_flat,
     }
-    with yt_dlp.YoutubeDL(opts) as ydl:
-        return ydl.extract_info(url, download=False)
+    if picker is None:
+        picker = CookieBrowserPicker(log=lambda lv, msg: None)
+
+    def _do_extract(opts):
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            return ydl.extract_info(url, download=False)
+
+    return picker.run(
+        url_label=f"[메타:{url[:60]}]",
+        action=_do_extract,
+        base_opts=base_opts,
+    )
 
 
 def is_playlist(info: dict) -> bool:
     return info.get("_type") == "playlist" or "entries" in info
 
 
-def expand_playlist(url: str) -> list[dict]:
+def expand_playlist(
+    url: str,
+    *,
+    picker: Optional["CookieBrowserPicker"] = None,
+) -> list[dict]:
     """플레이리스트 URL 또는 단일 URL → 영상 entry dict 리스트.
 
     각 entry 에 webpage_url 보장 (url 필드로 fallback).
     extract_flat 모드 — 빠르고 가벼움. 풀 메타는 다운로드 시점에 다시 가져옴.
     """
-    info = fetch_metadata(url, extract_flat=True)
+    info = fetch_metadata(url, extract_flat=True, picker=picker)
     if not is_playlist(info):
         return [info]
     entries = info.get("entries") or []
@@ -270,8 +309,12 @@ def download_video(
         on_progress(DownloadProgress(
             status="fetching_meta", url=url, message="메타 추출 중"
         ))
+    # picker — 이 영상 처리 동안 공유 (메타 + 다운로드 동일 브라우저 재사용).
+    # showdon-downloader 와 다르게 yejja 는 module-level function 이라 인스턴스 X.
+    # download_video 호출마다 새 picker 생성 (overhead 미미).
+    _picker = CookieBrowserPicker(log=lambda lv, msg: None)
     try:
-        info = fetch_metadata(url)
+        info = fetch_metadata(url, picker=_picker)
     except Exception as e:
         raise DownloadError(f"메타 추출 실패: {e}") from e
 
@@ -309,10 +352,10 @@ def download_video(
 
     # 3. 다운로드 — 원본/<basename>.mp4
     # outtmpl 의 basename 이 파일 시스템 안전한 문자라 그대로 사용 (filename.py 가 정제)
-    opts = {
+    base_opts = {
         "format": _FORMAT_PREFERENCE,
         "outtmpl": str(originals / f"{basename}.%(ext)s"),
-        "merge_output_format": "mp4",
+        "merge_output_format": _MERGE_OUTPUT_FORMAT,
         "quiet": True,
         "no_warnings": True,
         "no_color": True,
@@ -332,9 +375,33 @@ def download_video(
         }],
         "writeinfojson": True,
     }
+    # ★ showdon-downloader v0.4.0~0.4.7 와 동일 — picker 경유로 cookies fallback +
+    # EJS opt-in + tv_simply 자동 적용. _picker 는 메타 추출에서 이미 성공 브라우저
+    # 캐시 상태라 다운로드는 같은 브라우저로 단번에 진행.
+    # DownloadCancelled (progress hook 에서 raise) 는 picker 가 generic Exception 으로
+    # 잡아서 fallback 시도하지 않도록, DownloadError sentinel 로 변환 → picker 가
+    # non-recoverable 로 즉시 raise → 외부에서 sentinel 매칭으로 DownloadCancelled 복원.
+    _CANCEL_SENTINEL = "__YEJJA_USER_CANCELLED__"
+
+    def _do_download(opts):
+        try:
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                return ydl.extract_info(url, download=True)
+        except DownloadCancelled:
+            raise DownloadError(_CANCEL_SENTINEL) from None
+
     try:
-        with yt_dlp.YoutubeDL(opts) as ydl:
-            full_info = ydl.extract_info(url, download=True)
+        full_info = _picker.run(
+            url_label=f"[다운로드:{title[:40]}]",
+            action=_do_download,
+            base_opts=base_opts,
+        )
+    except DownloadError as e:
+        if _CANCEL_SENTINEL in str(e):
+            if on_progress:
+                on_progress(DownloadProgress(status="cancelled", url=url, title=title))
+            raise DownloadCancelled() from None
+        raise DownloadError(f"다운로드 실패: {e}") from e
     except DownloadCancelled:
         if on_progress:
             on_progress(DownloadProgress(status="cancelled", url=url, title=title))

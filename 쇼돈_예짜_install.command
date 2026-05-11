@@ -126,8 +126,20 @@ else
   ok "ffmpeg 설치 완료"
 fi
 
-# ---- 6. git ---------------------------------------------------------------
-step "6. git"
+# ---- 6. deno (yt-dlp 의 YouTube JS 챌린지 해결용) -------------------------
+# showdon-downloader v0.4.4 fix — yt-dlp 가 YouTube cipher 복호화 (JS 챌린지) 에
+# deno 사용. 없으면 다운로드 시 "Requested format is not available" 발생.
+step "6. deno (YouTube JS 챌린지 해결)"
+if command -v deno &>/dev/null; then
+  ok "이미 설치되어 있음"
+else
+  info "deno 를 brew 로 설치합니다..."
+  brew install deno
+  ok "deno 설치 완료"
+fi
+
+# ---- 7. git ---------------------------------------------------------------
+step "7. git"
 if command -v git &>/dev/null; then
   ok "이미 설치되어 있음"
 else
@@ -135,8 +147,8 @@ else
   brew install git
 fi
 
-# ---- 7. 저장소 클론 / 업데이트 --------------------------------------------
-step "7. showdon-yejja 저장소"
+# ---- 8. 저장소 클론 / 업데이트 --------------------------------------------
+step "8. showdon-yejja 저장소"
 
 if [ -d "$INSTALL_DIR/.git" ]; then
   info "최신 버전으로 업데이트 (git pull)..."
@@ -160,8 +172,8 @@ cd "$INSTALL_DIR"
 mkdir -p "$HOME/showdon/yejjas"
 ok "작업 폴더 준비: $HOME/showdon/yejjas"
 
-# ---- 8. Python 가상환경 ---------------------------------------------------
-step "8. Python 가상환경 (venv)"
+# ---- 9. Python 가상환경 ---------------------------------------------------
+step "9. Python 가상환경 (venv)"
 if [ ! -d "venv" ]; then
   info "venv 생성 중..."
   "$PYTHON_BIN" -m venv venv
@@ -176,14 +188,23 @@ source venv/bin/activate
 info "pip 업그레이드..."
 pip install --upgrade pip --quiet
 
-# ---- 9. 의존성 설치 -------------------------------------------------------
-step "9. 의존성 설치 (PySide6 + faster-whisper + mediapipe + VectCutAPI deps 등)"
+# ---- 10. 의존성 설치 ------------------------------------------------------
+step "10. 의존성 설치 (PySide6 + faster-whisper + mediapipe + VectCutAPI deps 등)"
 info "패키지 설치 중... (5~10분, 큰 패키지 다수 포함)"
 pip install -r requirements.txt
 ok "의존성 설치 완료"
 
-# ---- 10. 검증 -------------------------------------------------------------
-step "10. 설치 검증"
+# ---- 11. yt-dlp 최신 동기화 (git master) -----------------------------------
+# showdon-downloader v0.4.5/0.4.7 fix — requirements.txt 의 yt-dlp>=X 만으론 기존
+# 사용자 yt-dlp 가 upgrade 안 됨. YouTube 가 봇 감지/POT 정책을 자주 강화하므로
+# install 마다 항상 git master (가장 최신 코드) 로 동기화. 모든 팀원 환경 통일.
+step "11. yt-dlp 최신 동기화 (git master)"
+info "yt-dlp 를 git master 로 업그레이드 중... (1~2분)"
+pip install -U "yt-dlp @ git+https://github.com/yt-dlp/yt-dlp.git" --quiet
+ok "yt-dlp 동기화 완료 ($(python -c 'import yt_dlp; print(yt_dlp.version.__version__)'))"
+
+# ---- 12. 검증 -------------------------------------------------------------
+step "12. 설치 검증"
 python - <<'PYEOF'
 import sys
 print(f"Python: {sys.version.split()[0]}")
@@ -200,12 +221,12 @@ print(f"flask: {flask.__version__} / requests: {requests.__version__}  (VectCutA
 PYEOF
 ok "검증 통과"
 
-# ---- 11. 실행 권한 --------------------------------------------------------
+# ---- 13. 실행 권한 --------------------------------------------------------
 chmod +x "$INSTALL_DIR/run.command" 2>/dev/null || true
 chmod +x "$INSTALL_DIR/make_app.sh" 2>/dev/null || true
 
-# ---- 12. .app 자동 빌드 ---------------------------------------------------
-step "12. .app 번들 빌드"
+# ---- 14. .app 자동 빌드 ---------------------------------------------------
+step "14. .app 번들 빌드"
 deactivate 2>/dev/null || true
 APP_BUILT=0
 if (cd "$INSTALL_DIR" && ./make_app.sh); then
