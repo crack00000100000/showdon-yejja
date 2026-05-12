@@ -1,4 +1,4 @@
-# Quick-Reference 체크리스트 (★ v1.9.1 NEW — 작성 시 항상 참조 / ★ v1.9.5 manual srt 우선순위 추가 / ★ v1.9.6 manual srt timeline 매핑 + sub_cut 분할 cargo cult fix / ★ v1.9.7 explain 룰 전면 재구성 — TV 예능 자막 narration 형 / ★ v1.9.8 — @ 비율 ceiling 추가, drift 회피)
+# Quick-Reference 체크리스트 (★ v1.9.1 NEW — 작성 시 항상 참조 / ★ v1.9.5 manual srt 우선순위 추가 / ★ v1.9.6 manual srt timeline 매핑 + sub_cut 분할 cargo cult fix / ★ v1.9.7 explain 룰 전면 재구성 — TV 예능 자막 narration 형 / ★ v1.9.8 — @ 비율 ceiling 추가, drift 회피 / ★ v1.9.9 — explain 시점 정합 + dialog 완전 동일 금지, 평가 어휘 풀 폐지)
 
 > v1.9 의 self-check 19개 / 강제 룰 폭증 → cognitive load 위험.
 > 이 체크리스트는 **작성 마치고 출력 직전 1-page 만 순회** 하는 용도.
@@ -25,7 +25,9 @@
 - [ ] **★ v1.9.4 §6.2b STT 오인식 보정 의무** — `preference == "manual"` 이면 작동 X (manual 텍스트가 ground truth). `auto`·`none` 이면 동음/유사 발음 (예 `늘려/낼름`, `밉도/밑도`) 문맥 안 맞으면 STT 원본 + OCR 재대조 + 한국어 일상어 보정
 - [ ] **§13.5 통합 sync 재검증 9 항목** (★ v1.9.3 Preview/저장 + ★ v1.9.7 explain Family 검증) — timeline align / frame OCR / 통독 시뮬 / STT 비교 / explain 컨텍스트 / fact STT grep / manual 매핑 / **★ v1.9.7 explain Family 1/3/4/6 합산 70%+ / @ 검열 ≥ 1회 / Hold ≥ 1회** / sub_cut 정합
 - [ ] **★ v1.9.3 §9-pre 영상 흐름 표 작성** — 명시적 표 + 구체 디테일 컬럼. Preview 출력에 포함 의무
-- [ ] **★ v1.9.7 §9 explain TV 예능 자막 narration** — `~는데/~인데` 어미 0회 hard rule / 리뷰어 평가 어휘 (`명장면` `압권` `미친` `명대사` `빌드업`) 0회 hard rule / Family 1 (X중..) + Family 3 (의태어) + Family 4 (감정+@) + Family 6 (부호) 합산 70%+
+- [ ] **★ v1.9.7 §9 explain TV 예능 자막 narration** — `~는데/~인데` 어미 0회 hard rule / Family 1 (X중..) + Family 3 (의태어) + Family 4 (감정+@) + Family 6 (부호) 합산 70%+ (★ v1.9.9 — 평가 어휘 풀 hard rule 폐지: 카피 자유도 보존)
+- [ ] **★ v1.9.9 §9.10.1 explain 시점 정합** — dialog 발화 timeline 정확 파악 후, **dialog 발화 어휘를 explain 에 사용하는 경우** 그 어휘의 첫 발화 시점과 동시·직후로 explain.start 배치 (먼저 누설 X). dialog 에 등장하지 않는 자유 narration (의태어/X중/X ON 등) 은 시점 룰 무관. Family 9 Hold 면제. 260511 batch 21.8% 위반
+- [ ] **★ v1.9.9 §9.10.2 dialog ↔ explain 완전 동일 금지** — 공백/검열 (@·ㅇ삽입·자음분리)/부호 제거 후 한국어 문자 완전 일치 시 위반. substring 매치는 OK
 - [ ] **★ v1.9.8 §9 검열 시그니처 균형** — @ 검열 영상당 **() 의 0~50%** 권장 (데이터 평균 30%). **60%+ 매너리즘 위반 hard rule**. `(스ㅇ윽..)` 같은 ㅇ삽입 / `[ㄷ ㄷ;;]` 자음 분리도 검열 family 로 카운트. Non-@ family (Family 1 X중 / Family 3 의태어 / Family 6 부호 only) 우선 사용
 - [ ] **★ v1.9.7 §9 Hold 룰** — 같은 caption 2~4 frames hold 최소 1회 (1792 () 중 492회 paren_hold = 최다 type. narrative 강조 시그니처)
 - [ ] **★ v1.9.7 §9 시그니처 caption library 재사용** — 영상당 최소 1회 motif 풀에서 재사용 (예: `(스ㅇ윽..)` 31x / `(저벅저벅..)` 17x / `(주섬주섬..)` 16x / `(행@복)` 10x / `(?????)` 10x — 130개 motif pool)
@@ -1101,10 +1103,10 @@ sub_cut[2] = 62.5~64.0 (1.5초)
 - Hold 강조 (같은 caption 2~4 frames)
 
 **금지 (v1.9.6 매너리즘) ❌**
-- `~는데/~인데/~하는데` 어미
-- 리뷰어 평가 어휘 (`(이 컷 명장면)` `(빌드업 미친)` `(압권)`)
-- 1인칭 감상·촌평 (`(이 답변 미쳤다)` `(역대급 명대사)`)
+- `~는데/~인데/~하는데` 어미 (hard rule 유지)
 - 시청자 호명 (`끝까지 보세요` `여기 자막 잘 봐`)
+
+★ v1.9.9 — 평가 어휘 풀 hard rule 폐지 (`명장면` `압권` `미친` `명대사` `빌드업` 0회 룰 삭제). 어휘 풀로 제한하면 카피 자유도가 떨어져 자연스러운 explain 표현력 손실. v1.9.7 의 정체성 (TV 예능 자막 narration 형 + 객관 명사형 + 짧은 길이 + Family 1/3/4/6 합산 70%+) 으로 매너리즘 자연 방지 — 평가 어휘 풀은 별도 강제 안 함.
 - 1줄 8~16자 강제 (1~5자 minimal 권장)
 
 **허용 (v1.9.7 표준) ✅**
@@ -1536,6 +1538,56 @@ sub_cut[6] = 26.0~30.0 (마무리)
   └─ explain: 26.0~29.0 "(프@로포즈 성@공)"  ← Family 12 결과 + arc closure
 ```
 
+##### 9.10.1 explain 시점 룰 ★ v1.9.9 NEW — 발화 시점 정합
+
+★★★ 작성 원칙: () explain 의 시점은 그것이 묘사하는 발화/사건과 **정합** 시킨다. dialog 의 발화 reveal 보다 explain 이 먼저 누설하지 X.
+
+작성 절차 (LLM 너의 작업 순서):
+1. explain 카피 작성 **전** — dialog.srt 를 시간순으로 정독, 각 발화의 핵심 명사·동사·고유명사가 **몇 초** 에 발화되는지 정확히 파악
+2. explain 의 () 안에 **dialog 발화 어휘를 사용하는 경우**:
+   - 그 어휘의 dialog **첫 발화 시점** 을 찾고
+   - explain.start 를 그 발화 시점과 **동시 또는 직후** 로 잡는다 (먼저 누설 X)
+3. dialog 에 등장하지 않는 어휘로 narration — **자유**. TV 예능 자막 narration 의 본령 (의태어·X중·X ON·감정 명사·검열·시그니처 motif 등). dialog 발화 timing 과 무관
+
+위반 패턴 (260511 batch 실측 — 23영상 / 202 explain 중 44개 = 21.8% 위반):
+- explain `(역@할 카페 사장)` 13.5s ← dialog "역할" 첫 발화 25.5s = +12초 선행 ❌ 스포일러
+- explain `(81년생 보컬들..)` 7s ← dialog "보컬" 첫 발화 12.2s = +5.2초 선행 ❌
+- explain `(끝까지 간다 선언)` 10.5s ← dialog "끝까지" 첫 발화 19.2s = +8.7초 선행 ❌
+- explain `(아버@지 오픈런 가보)` 11s ← dialog "오픈런" 첫 발화 16.4s = +5.4초 선행 ❌
+- explain `(팬덤명 작명 ON)` 4s ← dialog "팬덤명" 첫 발화 10.8s = +6.8초 선행 ❌
+
+원인 진단: LLM 이 dialog 발화 timeline 을 제대로 파악하지 않은 채 dialog 발화 어휘를 explain 에 가져다 쓰면서 시점 임의 결정 → 후반 reveal 단어를 도입부 explain 에 누설.
+
+올바른 접근:
+- dialog 발화 timeline 정확 파악 후, dialog 어휘를 explain 에 가져다 쓰는 경우만 시점 정합 의무
+- dialog 에 없는 자유 narration (의태어/X중/X ON/검열/시그니처) 은 시점 룰 무관
+
+★ 면제: Hold (Family 9) — 이미 등장한 caption 의 재노출
+
+##### 9.10.2 explain ↔ dialog 완전 동일 금지 ★ v1.9.9 NEW
+
+★★ Hard rule: explain 의 () 안 텍스트가 dialog.srt 안 () caption 텍스트와 **완전 동일** 하면 X.
+
+"완전 동일" 정의 — 다음 후처리 후 한국어 문자만 비교:
+- 공백 제거
+- 검열 기호 (`@` / `ㅇ` 자음 분리 / 자음 변형) 제거
+- 부호 (`..` `;;` `!` `?` `~` 등) 제거
+
+위반 = 시청자에게 같은 자막이 dialog 영역 + explain 영역 두 위치 동시 노출.
+
+★ substring 매치 (한쪽이 다른쪽의 부분문자열) 는 OK — explain 이 dialog 의 () 를 확장한 narration 은 의도된 시그니처일 수 있음.
+
+✅ OK: dialog `(합창)` ↔ explain `(건 물 사~~줘요 합창)` (substring, 다른 텍스트)
+✅ OK: dialog `(시간 가는 줄도 모르고 파티 준비)` ↔ explain `(시간 가는 줄도 모르고)` (substring)
+✅ OK: dialog `(연락)` ↔ explain `(부동산 앱 연락 예고;;)` (substring)
+
+❌ Bad: dialog `(화장품 도둑 2)` ↔ explain `(화장품 도둑 2)` (완전 동일)
+❌ Bad: dialog `(조회수 폭발 예감)` ↔ explain `(조@회수 폭발 예감)` (검열 제거 후 동일)
+
+★ 260511 batch — 23 영상 중 2 영상에서 위반.
+
+페일세이프: 위반 시 explain 라인 삭제 또는 다른 family 로 통째 교체 (의태어·X중·부호·감정명사 등).
+
 #### 9.11 무 () 영상 (dialog 우선) 가이드
 
 234 중 34 영상 (14.5%) 이 () 0개. **dialog 가 강한 영상의 표준 패턴**.
@@ -1556,7 +1608,7 @@ sub_cut[6] = 26.0~30.0 (마무리)
 |---|---|---|
 | **정체성** | 리뷰어 시점 큐레이터 평가 | TV 예능 자막 narration 큐레이터 |
 | **어미** | `~는데/~인데` 35~50% 의무 | 명사형 (어미 거의 X). `~는데` 0회 hard rule |
-| **카피 어휘** | `명장면` `압권` `미친` `빌드업` (평가) | `(X중..)` `(X ON)` `(스ㅇ윽..)` (객관 narration) |
+| **카피 어휘** | `명장면` `압권` `미친` `빌드업` (평가) — v1.9.7~v1.9.8 hard rule 0건 | `(X중..)` `(X ON)` `(스ㅇ윽..)` (객관 narration). ★ v1.9.9 — 평가 어휘 풀 hard rule 폐지 (자연 narration 자유도 보존, 정체성 + Family 분포로 매너리즘 방지) |
 | **길이** | 1줄 8~16자 표준 | 1~5자 minimal 우선 (40%+). 긴 () 변형 5% 이하 |
 | **시점** | 1인칭 큐레이터 평가/감상 | 3인칭 객관 narration |
 | **시청자 호명** | "끝까지 보세요" 허용 | 시청자 호명 X. 큐레이터 narration 자족 |
@@ -1583,9 +1635,9 @@ sub_cut[6] = 26.0~30.0 (마무리)
 - `~/showdon/analysis/v1.9.7_reference_shorts/synthesis/context_to_explain_map.md` — context → explain 매핑 트리
 - `~/showdon/analysis/v1.9.7_reference_shorts/per_video_analysis/*.json` — 234 영상 개별 분석
 
-#### 9.14 v1.9.7 한 줄 정체성
+#### 9.14 v1.9.9 한 줄 정체성
 
-> **TV 예능 자막 narration 형 — 객관 + 짧은 명사형 + 의성어·의태어 + 모드 토글 (ON/OFF) + 검열 시그니처 (@ 비율 0~50% 균형) + Hold 강조. 시그니처 caption library (130개 motif pool) 영상 간 재사용.** (★ v1.9.8 — @ ceiling 60%, drift 회피)
+> **TV 예능 자막 narration 형 — 객관 + 짧은 명사형 + 의성어·의태어 + 모드 토글 (ON/OFF) + 검열 시그니처 (@ 비율 0~50% 균형) + Hold 강조. 시그니처 caption library (130개 motif pool) 영상 간 재사용. dialog 발화 시점과 정합 (★ v1.9.9 — 스포일러 회피). dialog () 와 완전 동일 X. 평가 어휘 풀 강제 폐지 (카피 자유도 보존).** (★ v1.9.8 — @ ceiling 60%, drift 회피)
 
 #### 9.5 인물 호칭 — v1.9.7 폐지 (★ v1.9.7 — 234 영상 데이터 거의 X)
 
@@ -1853,10 +1905,10 @@ v1.9.6 의 톤별 5~12% 등장 빈도 룰은 v1.9.7 §9.2 빈도 표 + §9.6 Pos
 | 2 | 영상 frame 안 자막 (OCR) ↔ dialog 텍스트 동시성 | dialog 라인 N개 중 **시작·중간·끝 3~5개 sample** 의 시각에 해당하는 `frames/f_NNNNN.jpg` 를 Read 로 직접 보고 텍스트 일치 확인 | sample 모두 텍스트 일치 (영상 자막 미박힘 라인은 ★ 코멘트 명시) |
 | 3 | timeline 통독 시뮬 (시청자 시점) | dialog.srt 를 1번 entry → 마지막 entry 까지 순서대로 읽으며 "흐름이 자연스러운가" 머릿속 시뮬레이션 | 끊김·중복·누락 0 |
 | 4 | dialog text ↔ STT word text 비교 | 각 entry text 의 어절을 같은 시각의 `stt.segments[].words[].word` 와 비교 | 일치 또는 OCR 우선 (§6.2b) 으로 명시적 보정만 |
-| 5 | explain 라인 ↔ 그 시각 dialog/STT 컨텍스트 일치 | explain `(스ㅇ윽..)` `(?????)` 등 의태어/부호 → 그 시각 인물 동작/표정 frame OCR 매치. 발화 의태어 (`(꿀@꺽)` 등) → STT 음 매치 | 컨텍스트 매치 또는 explain 라인 삭제 |
-| **6 ★ v1.9.7 강화** | **explain Family 시스템 검증 — v1.9.7 §9.4 Family 매핑 검증** | 모든 () explain 라인이 §9.4 12 Family 중 어느 family 에 속하는지 + 그 family 의 형식 공식 따랐는지 검증. v1.9.6 fact 근거 룰 (`(미친)` 평가 어휘) 폐기 | (a) `~는데/~인데` 어미 0건 hard rule (b) 리뷰어 평가 어휘 (`명장면` `압권` `미친` `명대사` `빌드업`) 0건 hard rule (c) Family 1/3/4/6 합산 70%+ (d) Family 7 (@ 검열) 영상당 ≥ 1회 (e) Family 9 (Hold) 영상당 ≥ 1회 (f) 시그니처 caption library 재사용 ≥ 1회 |
+| **5 ★ v1.9.9 강화** | explain 라인 ↔ 그 시각 dialog/STT 컨텍스트 일치 + ★ 스포일러 검증 + ★ dialog 완전 동일 검증 | explain `(스ㅇ윽..)` `(?????)` 등 의태어/부호 → 그 시각 인물 동작/표정 frame OCR 매치. 발화 의태어 (`(꿀@꺽)` 등) → STT 음 매치. ★ v1.9.9 — explain () 안에 dialog 발화 어휘 들어있으면 `explain.start ≥ dialog 첫 발화 시점` 검증 (스포일러 회피, §9.10.1). ★ v1.9.9 — explain () 텍스트가 dialog 의 () caption 과 공백/검열/부호 제거 후 완전 일치 검증 (§9.10.2) | 컨텍스트 매치 + 스포일러 0건 + 완전 동일 0건 |
+| **6 ★ v1.9.9 갱신** | **explain Family 시스템 검증 — v1.9.7 §9.4 Family 매핑 검증** | 모든 () explain 라인이 §9.4 12 Family 중 어느 family 에 속하는지 + 그 family 의 형식 공식 따랐는지 검증 | (a) `~는데/~인데` 어미 0건 hard rule (★ v1.9.9 — 평가 어휘 풀 hard rule 폐지) (c) Family 1/3/4/6 합산 70%+ (d) Family 7 (@ 검열) 영상당 ≥ 1회 (e) Family 9 (Hold) 영상당 ≥ 1회 (f) 시그니처 caption library 재사용 ≥ 1회 |
 | **7 ★ v1.9.6 NEW** (boost B) | **manual ↔ dialog timeline 1:1 매핑 자동 검증** — `preference == "manual"` 일 때만 작동 | 각 dialog[i] 마다 (a) `dialog[i].text` 가 manual_overlap[i].text 의 정확한 substring 또는 그대로 인지 (curly→straight quote 변형 / 마침표 추가 / 띄어쓰기 보정 등 모두 위반) (b) `abs(dialog[i].start - (manual_overlap[i].start - sub_cut.start)) ≤ 0.3s` (c) 한 칸 shift bug 패턴 (`dialog[i].time = manual_overlap[i+1].time` 패턴) 0건 | (a)·(b)·(c) 모두 통과 |
-| **8 ★ v1.9.8 강화** (Family 분포 + @ ceiling) | **explain Family 분포 자동 측정 — TV 예능 자막 narration 형 검증** | 자동 측정 + 보고: 1) Family 1~12 분포 % / 2) `~는데/~인데` 어미 등장 회수 (목표 0) / 3) 리뷰어 평가 어휘 등장 회수 (목표 0) / 4) 길이 분포 / 5) @ 검열 비율 (★ v1.9.8 추가 — 0~50% 권장) / 6) Hold 회수 / 7) 시그니처 motif 풀 재사용 회수 / 8) 라인 수 vs §9.2 | (a) `~는데/~인데` 0 hard rule (b) 평가 어휘 0 hard rule (c) Family 1/3/4/6 합산 70%+ (d) 길이 1~5자 75%+ (e) ★ v1.9.8 — @ 비율 < 60% hard rule (50%+ warning) (f) Hold ≥ 1회 (g) 시그니처 motif 재사용 ≥ 1회 (h) 라인 수 §9.2 권장 |
+| **8 ★ v1.9.9 강화** (Family 분포 + @ ceiling + 시점/완전동일) | **explain Family 분포 자동 측정 — TV 예능 자막 narration 형 검증** | 자동 측정 + 보고: 1) Family 1~12 분포 % / 2) `~는데/~인데` 어미 등장 회수 (목표 0) / 3) 길이 분포 / 4) @ 검열 비율 (★ v1.9.8 — 0~50% 권장) / 5) Hold 회수 / 6) 시그니처 motif 풀 재사용 회수 / 7) 라인 수 vs §9.2 / 8) ★ v1.9.9 — 스포일러 카운트 (explain 안 의미 토큰의 dialog 첫 발화 시점 vs explain.start) / 9) ★ v1.9.9 — dialog ↔ explain 완전 동일 카운트 (공백/검열/부호 제거 후) | (a) `~는데/~인데` 0 hard rule (c) Family 1/3/4/6 합산 70%+ (d) 길이 1~5자 75%+ (e) ★ v1.9.8 — @ 비율 < 60% hard rule (50%+ warning) (f) Hold ≥ 1회 (g) 시그니처 motif 재사용 ≥ 1회 (h) 라인 수 §9.2 권장 (i) ★ v1.9.9 — 스포일러 0건 (§9.10.1 Family 9 면제) (j) ★ v1.9.9 — dialog ↔ explain 완전 동일 0건 (§9.10.2) |
 | **9 ★ v1.9.6 NEW** (boost A) | **sub_cut.start/end ↔ manual segment 정합 검증** — `preference == "manual"` 일 때만 작동 | 각 sub_cut 마다 (a) sub_cut.start 가 manual segment 한복판 (`manual_seg.start + 0.1 ≤ sub_cut.start ≤ manual_seg.end - 0.1`) 인지 / (b) sub_cut.end 도 동일 / (c) 케이스 분류 (A: 정확 정합 / B: boundary / C: 한복판) + 보정 추천 (보정 A/B) | 위반 0건 또는 보정 적용 후 재검증 통과 |
 
 #### 위반 시 액션 (재작성 의무)
@@ -1864,7 +1916,7 @@ v1.9.6 의 톤별 5~12% 등장 빈도 룰은 v1.9.7 §9.2 빈도 표 + §9.6 Pos
 - **1·4 미달** → 해당 entry 시각 재계산. §6.2b OCR 우선 룰 다시 적용 (frame OCR 시각 강제 채택). dialog.srt 부분 재작성.
 - **2 미달** → 해당 라인 ±1s frame 직접 Read 로 실제 노출 시각 찾아 시각 보정. 또는 영상 자막 미박힘 라인이면 self-check 결과에 명시.
 - **3 미달 (통독 시뮬에서 끊김/중복/누락 발견)** → §6.2 의 분할 패턴 (5.A~E) 재검토. word gap 잘못 적용했거나 음성 일부 누락 의심. dialog.srt 재작성.
-- **5 미달** → explain 라인 삭제 또는 §9.6 의 카피 카테고리 1~5 로 텍스트 교체. explain.srt 재작성.
+- **5 미달** → 컨텍스트 미달 시 explain 라인 삭제 또는 다른 family 로 교체. ★ v1.9.9 — 스포일러 위반 시: §9.10.1 페일세이프 (`explain.start` 를 dialog 첫 발화 시점 이후로 미루기 또는 토큰 없는 family 로 교체). dialog 완전 동일 위반 시: §9.10.2 페일세이프 (explain 라인 삭제 또는 다른 family 로 통째 교체).
 - **6 미달** (★ v1.9.4 강화)
   - (a) 단어 1~2개 평가 → fact 추가하여 재작성
   - (b) STT 에 없는 단어 임의 추가 → STT 에 있는 fact 로 교체 또는 삭제
@@ -1874,15 +1926,16 @@ v1.9.6 의 톤별 5~12% 등장 빈도 룰은 v1.9.7 §9.2 빈도 표 + §9.6 Pos
   - (a) 텍스트 변형 → manual segment 텍스트 그대로 복원 (curly quote 보존)
   - (b) 시각 어긋남 (한 칸 shift) → §6.2c v1.9.6 pseudocode 재적용. dialog[i].start = manual_overlap[i].start - sub_cut.start 로 재계산. dialog.srt 재작성.
   - (c) 케이스 B (sub_cut.start = manual segment boundary) 면 §6.2c v1.9.6 케이스 분석 + sub_cut.start 보정 검토
-- **8 미달** (★ v1.9.7 강화)
+- **8 미달** (★ v1.9.9 갱신 — 평가 어휘 풀 폐지 + (i)(j) 추가)
   - (a) `~는데/~인데` 어미 등장 → 명사형으로 통째 재작성 (Family 1/3/4/6 중 매핑)
-  - (b) 리뷰어 평가 어휘 (`명장면` `압권` `미친` `명대사` `빌드업`) 등장 → 통째 삭제 또는 Family 어휘로 재작성
   - (c) Family 1/3/4/6 합산 < 70% → 의태어/X중/감정명사/부호로 라인 추가 또는 교체
   - (d) 길이 1~5자 < 75% → 긴 라인을 시그니처 motif 풀에서 짧은 caption 으로 교체
   - (e) ★ v1.9.8 — @ 비율 60%+ → 일부 @ 라인을 non-@ family 로 교체 (Family 1 X중 / Family 3 의태어 / Family 6 부호 only / Family 2 X ON). 50~60% 도 1~2개 교체 권장
   - (f) Hold 0회 → 클라이맥스 sub_cut 에 동일 caption 2~4 frames hold 추가
   - (g) 시그니처 motif 재사용 0회 → §9.5 caption library 에서 영상 visual context 와 일치하는 motif 1개 박기
   - (h) 라인 수 < 권장 → §9.2 빈도 표 기준으로 라인 추가
+  - (i) ★ v1.9.9 — 스포일러 발견 (explain () 안 의미 토큰이 dialog 발화보다 먼저 등장) → §9.10.1 페일세이프: `explain.start` 를 dialog 첫 발화 시점 이후로 미루기, 또는 토큰 없는 family (의태어/X중/부호 only) 로 교체
+  - (j) ★ v1.9.9 — dialog ↔ explain 완전 동일 발견 (공백/검열/부호 제거 후 일치) → §9.10.2 페일세이프: explain 라인 삭제 또는 다른 family 로 통째 교체
 - **9 미달** (★ v1.9.6 NEW)
   - (a) 케이스 C (한복판) → §6.1 v1.9.6 보정 A (sub_cut.start = manual_seg.start) 또는 (보정 B, sub_cut.start = manual_seg.end + 0.05) 적용. edit_plan.json 의 sub_cuts[].start/end 재계산.
   - (b) 케이스 B (boundary) — 직전 segment 음성 확인 후 (보정 A) 채택 검토 (§11 C20)
@@ -1900,7 +1953,7 @@ v1.9.6 의 톤별 5~12% 등장 빈도 룰은 v1.9.7 §9.2 빈도 표 + §9.6 Pos
    5. explain ↔ 컨텍스트 — N라인 매치
    6. ★ explain fact 근거 — N/N 라인 명시 (단어 1~2개 평가 0건)
    7. ★ v1.9.6 manual ↔ dialog timeline 1:1 — N라인 매핑 통과 (한 칸 shift 0건, curly quote 보존 ✓)  [preference == "manual" 일 때만]
-   8. ★ v1.9.8 explain Family 분포 — Family 1/3/4/6 합산 X% (70%+) / `~는데/~인데` 어미 V개 (0) / 평가 어휘 W개 (0) / 길이 1~5자 Y% (75%+) / ★ @ 비율 R% (cap 60%, 0~50% 권장) / Hold N회 / 시그니처 motif 재사용 M회 / 라인 수 K개 (영상 길이 P초 → 권장 §9.2)
+   8. ★ v1.9.9 explain Family 분포 — Family 1/3/4/6 합산 X% (70%+) / `~는데/~인데` 어미 V개 (0) / 길이 1~5자 Y% (75%+) / ★ @ 비율 R% (cap 60%, 0~50% 권장) / Hold N회 / 시그니처 motif 재사용 M회 / 라인 수 K개 (영상 길이 P초 → 권장 §9.2) / ★ v1.9.9 스포일러 0건 / ★ v1.9.9 dialog ↔ explain 완전 동일 0건
    9. ★ v1.9.6 sub_cut ↔ manual segment 정합 — N개 sub_cut 모두 케이스 A 또는 보정 후 통과 (위반 0건)  [preference == "manual" 일 때만]
 ```
 
@@ -2664,6 +2717,8 @@ v1.3 부터 **face_clusters 의 cluster_id 자동 채워짐** (Simple IoU 클러
 # 변경 이력
 | 버전 | 날짜 | 변경 |
 |------|------|------|
+| v1.9.9 | 2026-05-12 | 260511 batch (와이프 몰래 홈파티 ft. 하동균/현봉식/김지훈 — 23영상 / 202 explain) frame-level audit 기반 3가지 패치 — **(A) §9.10.1 explain 시점 정합 (★ NEW hard rule)** explain () 의 시점은 묘사하는 발화/사건과 정합. dialog 발화 timeline 정확 파악 후 dialog 발화 어휘를 explain 에 사용하는 경우 explain.start ≥ dialog 첫 발화 시점 (먼저 누설 X). dialog 에 없는 자유 narration (의태어/X중/X ON/검열/시그니처) 은 시점 룰 무관. Family 9 Hold 면제. 23영상 audit 결과 21.8% (44/202) 위반 — 극단 +12s 선행 케이스 (`(역@할 카페 사장)` `(81년생 보컬들..)` 등). 룰의 핵심 = threshold 강제가 아니라 LLM 이 dialog 발화 timing 을 사전 정독 후 작성 절차 명시 / **(B) §9.10.2 explain ↔ dialog 완전 동일 금지 (★ NEW hard rule)** explain () 텍스트가 dialog.srt 안 () caption 텍스트와 공백/검열(@·ㅇ삽입·자음분리)/부호 제거 후 완전 일치 시 위반. 시청자에게 같은 자막이 두 위치 동시 노출 회피. substring 매치 (예 dialog `(합창)` ↔ explain `(... 합창)`) 는 OK — 의도된 확장 narration. 23영상 audit 결과 2영상 위반 (`(화장품 도둑 2)` `(조@회수 폭발 예감)`) / **(C) v1.9.7~v1.9.8 평가 어휘 풀 hard rule 폐지** (`명장면` `압권` `미친` `명대사` `빌드업` 0건 룰 삭제). 어휘 풀로 제한하면 카피 자유도 손실 — TV 예능 자막 narration 정체성 + Family 1/3/4/6 합산 70%+ 분포 룰로 매너리즘 자연 방지. `~는데/~인데` 어미 0회 hard rule 은 유지 (어미는 어휘 풀과 다른 카테고리, v1.9.7 234 영상 데이터 reference 유지). v1.9.8 @ ceiling 60% / Family 분포 70%+ / Hold ≥1회 / motif ≥1회 등 분포 룰 유지 — backend 변경 X (system prompt + §13.5 검증 5/6/8/위반액션/통과결과 갱신만). 상세 분석은 ~/showdon/analysis/v1.9.8_audit/ 참조 |
+| v1.9.8 | 2026-05-11 | v1.9.7 + 광고감독 시그니처 균형 — **(1) §9 검열 시그니처 ceiling 신설** @ 검열 영상당 () 의 0~50% 권장 (데이터 평균 30%). 60%+ = 매너리즘 위반 hard rule. `(스ㅇ윽..)` 같은 ㅇ삽입 / `[ㄷ ㄷ;;]` 자음 분리도 검열 family 로 카운트. Non-@ family (Family 1 X중 / Family 3 의태어 / Family 6 부호 only) 우선 사용 / **(2) §13.5 검증 #8 @ 비율 자동 측정 추가** + Quick-Reference Hard rule 항목 추가. backend 변경 X — v1.9.7 의 floor (영상당 ≥1회) 룰은 유지하되 ceiling (60%+) 신설로 검열 시그니처 drift 회피 |
 | v1.9.6 | 2026-05-09 | v1.9.5 9개 영상 audit (본헤이터 EP) 기반 5가지 패치 — **(A) §6.2c manual srt timeline 매핑 알고리즘 명시화** dialog[i] = manual_overlap[i] 1:1 매핑 강제. 한 칸 shift bug fix. sub_cut.start 가 manual segment.end 케이스 처리 룰 신설 (보정 A/B). manual 텍스트 변형 금지 항목 강화 (curly quote 보존 등). 9개 영상 중 3개 (33%) shift bug 발생 fix / **(B) §6.1 sub_cut boundary 보강** preference == "manual" 일 때 manual srt segments 에도 §6.1 v1.9 보정 룰 적용. sub_cut 분할 cargo cult 회피 — 영상 길이별 최소 sub_cut 갯수 강제 (20s+ 최소 2 / 30s+ 최소 3 / 45s+ 최소 4). scene_cut 3개+ 내장 sub_cut 분할 안 했으면 의도 명시 의무. 9개 영상 중 8개 (89%) start segment 한복판 위반 fix / **(C) §9.5 화자 매칭 검증 확장** 동사형 행동 표현 (받아치는데/토로하는데/회상하는데 등) 도 face_cluster + STT 검증 의무 / **(D) §9.6 explain 매너리즘 회피** explain 라인 *최소* 갯수 강제 (cap 의 함정 회피, 9개 영상 모두 정확 5개 → 영상 길이별 6~10 최소). 도입부 패턴 (1) 사용률 cap < 30% (현재 100%). 매너리즘 어휘 cap ('미친' < 15%). few-shot 예시 30~50개 직접 박음 / **(E) §13.5 Preview self-check 7~8~9번 추가** manual ↔ dialog timeline 자동 검증 + explain 매너리즘 자동 측정 + sub_cut.start/end manual 정합 검증 + §11 C19·C20 추가. 상세는 ~/showdon/analysis/v1.9_yejja/v1.9.6_diagnosis_v1.0.md 참조 |
 | v1.9.5 | 2026-05-09 | yt-dlp manual 자막 도입 — STT 텍스트 정확도 ~85% → manual 자막 ~99%+ 회복. 4가지 변경 — **(A) §6.2c 신설 ★ 가장 큰 변경** — `transcript_source.json` 의 `preference` 필드 분기. `manual` 이면 dialog 텍스트는 manual srt ground truth (STT 무시) / timing·비언어는 STT word-level 보강 (하이브리드). `auto`·`none` 이면 v1.9.4 흐름 그대로 / **(B) §6.2b OCR 우선 룰 분기** — `preference == "manual"` 일 때 §6.2b 작동 X. OCR 결과는 §9-pre 영상 흐름 표 + §10 제목 매치 reference 로만 활용 (dialog 보강 X). manual srt 가 dialog 의 정답이라 OCR 비교 불필요 + 자동 편집 시간 절약 / **(C) §6.2b STT 오인식 보정 룰 (v1.9.4) 분기** — `preference == "manual"` 일 때 작동 X (manual 텍스트가 ground truth, 자체 보정 불필요). manual 자체가 의심스러우면 사용자에게 보고 (코워크 의역 X) / **(D) §11 C17·C18 추가** (manual 텍스트 vs STT / `preference == "manual"` 일 때 §6.2b 작동 X) — backend 동시 변경: schema.py 에 TranscriptSourceJson dataclass 신설 / analyze.py 에 _detect_and_copy_transcripts() + step 1b 추가 / showdon-downloader 의 ydl_opts 에 자막 옵션 + writeinfojson 추가. 효과: STT 오인식 자동 정정 (`늘려/낼름` 등 v1.9.4 보정 룰 자동 해결) + 비속어 검열 자동 (채널 시그니처 보존) + 화자 겹침 슬래시 (`/`) 자동 + 처리 시간 ↓ (3시간 영상 STT skip 가능성 검토 중). 본헤이터 EP PoC 통과 (manual ko + en 둘 다 있음, 1219 segments). 상세 ~/showdon/analysis/v1.9_yejja/v1.9.5_manual_srt_도입_v1.0.md (작성 예정) |
 | v1.9.4 | 2026-05-09 | v1.9.3 본헤이터 EP 5 결과물 검증 (사용자 피드백 12개 + STT 원본 grep 재검증) 기반 5가지 패치 — **(A) §9.6 정체성 박스 ★ 20대 여성 편집자 톤** white/black list 표 신설. White: `~네`, `~잖아요`, `~던데`, `~더라고`, `~봤어요`, `왜케`, `완전`, `진짜`, `완전체`, `갑자기`, `어쨌든`, `근데` / Black: 좌중·사이클·디테일·완성도·케미·연출이 살아있·편집팀이 잘·타이밍 미쳤·자막 분석 카피·매너리즘 표현 / **(B) §9.6 카피 작성 룰 4종 신설** — 룰 1 (자막 분석 X — 자막에 박힌 단어 그대로 평가하는 카피 절대 X), 룰 2 (남의 채널 편집팀 칭찬 X — "편집팀이 잘 살린", "타이밍 미쳤" 같은 메타 코멘트 X), 룰 3 (약한 추측 회피 — "~인 것 같은", "~하지 않을까", "~할지도" 빼고 단정 못 하면 카피 빼기), 룰 4 (시리즈 reference 검증 — "X 시리즈에 Y 추가" 박을 때 영상에서 X 가 실제로 언급/시청자 공유 fact 인지 확인) / **(C) §9.5 화자 매칭 검증 ★ hard rule** — "X 본인", "Y 가 직접" 같이 인물 명시한 explain 박을 때 STT speaker_id + face_clusters dominant 일치하는지 한 번 더 확인 의무. 추측 화자 명시 X / **(D) §6.2b STT 오인식 보정 의무 ★ NEW** — 동음/유사 발음 (예 `늘려/낼름`, `밉도/밑도`) 문맥 안 맞으면 STT 원본 + OCR 재대조 + 한국어 일상어 보정. 의심 단어 그대로 박지 X / **(E) §13.5 6번 항목 강화** — 형식적 fact 명시 → STT 원본 grep 검증 (`grep -i "키워드" *.srt` 로 실제 발화/시청자 fact 인지 확인). 빈도 못 채워도 fact 근거 없는 카피 빼기 + §11 충돌 결정 표 C15 (white/black list vs 자연 발화), C16 (fact 검증 vs 빈도) 추가. 상세 분석은 ~/showdon/analysis/v1.9_yejja/v1.9.3_본헤이터_결과물_분석_v2.0.md 참조 |
