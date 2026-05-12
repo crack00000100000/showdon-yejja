@@ -39,15 +39,44 @@ from typing import Any, Callable, Optional, TYPE_CHECKING
 # - CapCut 모드는 .mp4 결과 아니라서 자동 skip.
 # - 끄려면 None 으로.
 #
-# ★ v1.9.1 — 환경변수 YEJJA_PROD=1 이면 디버그 OFF (None) 강제.
-#   make_app.sh 빌드 결과 .app 의 launcher 가 YEJJA_PROD=1 박음 →
-#   .app 더블클릭 실행은 무조건 PROD (디버그 자동복사 OFF).
-#   본인이 `python gui.py` / `run.command` 로 직접 띄우면 env 없으니 디버그 ON 그대로.
-_DEBUG_AUTO_OUTPUT_DIR_DEV: Optional[str] = "~/showdon/yejjas_test/auto"
-DEBUG_AUTO_OUTPUT_DIR: Optional[str] = (
-    None if os.environ.get("YEJJA_PROD") == "1"
-    else _DEBUG_AUTO_OUTPUT_DIR_DEV
-)
+# ★ v1.9.3 — 우선순위 (높→낮):
+#   1) 환경변수 YEJJA_PROD=1 → None (PROD 모드, 자동복사 OFF)
+#   2) 환경변수 YEJJA_DEBUG_AUTO_DIR (수동 override) → 그 path
+#   3) AppConfig.debug_auto_output_dir (디버깅 탭에서 GUI 로 변경 가능)
+#   4) Default fallback: ~/showdon/yejjas_test/auto
+#
+# 사용처 (line 2150 근처) 가 모듈 import 시점이 아닌 함수 호출 시점에
+# resolve 되도록 함수 호출. _resolve_debug_auto_output_dir() 매번 재평가.
+_DEBUG_AUTO_OUTPUT_DIR_DEFAULT: Optional[str] = "~/showdon/yejjas_test/auto"
+
+
+def _resolve_debug_auto_output_dir() -> Optional[str]:
+    """우선순위 따라 디버그 자동출력 폴더 결정. 자동편집 호출 때마다 재평가.
+
+    config 변경 즉시 반영 (GUI 재시작 없이) — 디버깅 탭에서 경로 변경 후 곧바로 효과.
+    """
+    # 1) PROD 모드 — 무조건 OFF
+    if os.environ.get("YEJJA_PROD") == "1":
+        return None
+    # 2) env 수동 override
+    env_path = os.environ.get("YEJJA_DEBUG_AUTO_DIR")
+    if env_path:
+        return env_path
+    # 3) AppConfig 에서 읽기 (디버깅 탭이 변경한 값)
+    try:
+        from .config import load_config
+        cfg = load_config()
+        if cfg.debug_auto_output_dir:
+            return cfg.debug_auto_output_dir
+    except Exception:
+        pass  # 초기 import / 순환 import 방지
+    # 4) Default
+    return _DEBUG_AUTO_OUTPUT_DIR_DEFAULT
+
+
+# ★ Legacy 호환 — 모듈 변수로도 노출 (테스트·외부 모니터링용).
+# 단 실제 사용처는 _resolve_debug_auto_output_dir() 함수 호출 권장.
+DEBUG_AUTO_OUTPUT_DIR: Optional[str] = _resolve_debug_auto_output_dir()
 
 
 @lru_cache(maxsize=8)
@@ -115,16 +144,41 @@ NOTO_SANS_KR_BOLD_URL = (
     "https://github.com/googlefonts/noto-cjk/raw/main/Sans/OTF/Korean/NotoSansCJKkr-Bold.otf"
 )
 
+# ★ 비-BMP 이모지 (🎶🐶🔥 등) fallback — Noto Sans CJK KR 에 비-BMP pictographs
+# 글리프 없어서 libass 가 tofu (□) 렌더링하는 문제 fix.
+#
+# Noto Emoji (monochrome variable, ~2MB, Apache 2.0). family = "Noto Emoji".
+# ensure_font 가 자동 다운로드 → ~/Library/Fonts/ 등록 → libass 가 fontconfig 로 매칭.
+#
+# ★ 학습사항 (2026-05-12, M4 Pro / Homebrew ffmpeg):
+# 컬러 이모지 시도 2회 모두 tofu — Apple Color Emoji (.ttc + CBDT) 도, Noto Color
+# Emoji (.ttf + CBDT) 도 libass 가 풀지 못함. fontconfig 자동 fallback substitution
+# 도 호출 안 됨. 즉 사용자 ffmpeg 빌드는 **CBDT color bitmap 자체** 호환 X.
+# 흑백 monochrome (Noto Emoji glyf 테이블) 만 안정. 향후 ffmpeg 빌드 업데이트되면 재시도 가능.
+NOTO_EMOJI_URL = (
+    "https://github.com/google/fonts/raw/main/ofl/notoemoji/NotoEmoji%5Bwght%5D.ttf"
+)
+NOTO_EMOJI_FILENAME = "NotoEmoji-VariableFont_wght.ttf"
+NOTO_EMOJI_FAMILY = "Noto Emoji"
+
+# ASS 안 비-BMP 이모지 wrap 시 사용할 폰트 family. 흑백 monochrome 만 안정.
+EMOJI_RENDER_FAMILY = NOTO_EMOJI_FAMILY
+
 
 def ensure_font(font_path: Path) -> Path:
-    """Noto Sans CJK KR Bold 폰트 자동 다운로드 + ~/Library/Fonts/ 에 복사.
+    """주 폰트 (Noto Sans CJK KR Bold) + 이모지 폰트 (Noto Emoji) 자동 다운로드.
 
     macOS 에서 ~/Library/Fonts/ 의 폰트는 시스템 fontconfig 에 자동 등록됨.
     ffmpeg/libass 가 ASS 의 Fontname 으로 자동 매칭 → fontsdir 옵션 불필요.
+
+    Args:
+        font_path: 주 폰트 (CJK KR) 의 캐시 경로. 이모지 폰트는 같은 디렉토리에
+            ``NotoEmoji-VariableFont_wght.ttf`` 로 별도 저장 — _srt_to_ass 의
+            ``{\\fnNoto Emoji}`` inline 태그 fallback 용.
     """
     font_path = Path(font_path).expanduser()
 
-    # 1. 다운로드 (캐시 위치 — _fonts/)
+    # 1. 주 폰트 (Noto Sans CJK KR Bold) 다운로드
     if not font_path.exists():
         font_path.parent.mkdir(parents=True, exist_ok=True)
         r = subprocess.run(
@@ -134,18 +188,70 @@ def ensure_font(font_path: Path) -> Path:
         if r.returncode != 0 or not font_path.exists():
             raise EditError(f"폰트 다운로드 실패: {r.stderr.strip()[:200]}")
 
-    # 2. macOS 시스템 폰트 폴더에 복사 (libass 가 fontconfig 로 찾을 수 있게)
+    # 2. 이모지 폰트 (Noto Emoji 흑백) 다운로드 — 실패해도 주 폰트는 동작 (best-effort).
+    # 이모지 없는 영상은 정상 동작, 이모지 있는 영상만 tofu 영향.
+    emoji_path = font_path.parent / NOTO_EMOJI_FILENAME
+    if not emoji_path.exists():
+        r = subprocess.run(
+            ["curl", "-fsSL", NOTO_EMOJI_URL, "-o", str(emoji_path)],
+            capture_output=True, text=True,
+        )
+        if r.returncode != 0 or not emoji_path.exists():
+            # 불완전 파일 있으면 삭제 (다음 호출 때 재시도)
+            try:
+                if emoji_path.exists():
+                    emoji_path.unlink()
+            except Exception:
+                pass
+
+    # 3. macOS 시스템 폰트 폴더에 복사 (libass 가 fontconfig 로 찾을 수 있게)
     try:
         user_fonts_dir = Path.home() / "Library" / "Fonts"
         user_fonts_dir.mkdir(parents=True, exist_ok=True)
-        target = user_fonts_dir / font_path.name
-        if not target.exists():
-            shutil.copy2(font_path, target)
+        for src in (font_path, emoji_path):
+            if not src.exists():
+                continue
+            target = user_fonts_dir / src.name
+            if not target.exists():
+                shutil.copy2(src, target)
     except Exception:
         # 시스템 등록 실패해도 fallback 폰트로 표시는 됨
         pass
 
     return font_path
+
+
+# 비-BMP 코드포인트 감지 — 🐶🎶🔥 등 pictographs/emoji (Noto Sans CJK KR 미커버 영역).
+# BMP 안 ♪♫★♥ 같은 BMP symbol 은 Noto Sans CJK KR 가 자체 커버하므로 wrap X.
+_EMOJI_RE = re.compile(r'[\U00010000-\U0010FFFF]+')
+
+
+def _inject_emoji_fontname(text: str, main_font: str,
+                           emoji_font: str = EMOJI_RENDER_FAMILY) -> str:
+    """ASS 텍스트의 비-BMP 이모지를 ``{\\fn<emoji>}…{\\fn<main>}`` 인라인 태그로 wrap.
+
+    Why: Noto Sans CJK KR 는 비-BMP pictographs (🎶🐶🔥 U+1F000+) 글리프 미보유 →
+    libass 가 tofu (□) 로 렌더. fontconfig 자동 fallback 은 ffmpeg/libass 빌드별
+    동작 다름 → inline ``{\\fn}`` 으로 명시 전환이 가장 견고.
+
+    ASS override block ({\\an8}, {\\pos(x,y)} 등) 은 그대로 보존.
+    """
+    if not _EMOJI_RE.search(text):
+        return text
+
+    # {tag} 와 일반 텍스트 분리 — re.split(keep delimiters)
+    parts = re.split(r'(\{[^}]*\})', text)
+    out: list[str] = []
+    for p in parts:
+        if p.startswith('{') and p.endswith('}'):
+            out.append(p)  # override block — 그대로
+        else:
+            # 일반 텍스트 — 비-BMP 만 emoji 폰트로 wrap
+            out.append(_EMOJI_RE.sub(
+                lambda m: f'{{\\fn{emoji_font}}}{m.group(0)}{{\\fn{main_font}}}',
+                p,
+            ))
+    return ''.join(out)
 
 
 # =============================================================================
@@ -929,6 +1035,9 @@ def _srt_to_ass(
 
         # 텍스트: 줄바꿈을 \N 으로
         text_lines = "\\N".join(lines[text_start:])
+        # ★ 비-BMP 이모지 (🎶🐶🔥 등) 만 Noto Emoji 로 inline 전환 — Noto Sans CJK KR
+        # 가 비-BMP pictographs 글리프 미보유 → tofu 방지. BMP 안 ♪♫★♥ 은 무관.
+        text_lines = _inject_emoji_fontname(text_lines, main_font=font_name)
 
         out_lines.append(
             f"Dialogue: 0,{start_ass},{end_ass},Default,,0,0,0,,{text_lines}"
@@ -2156,17 +2265,20 @@ def produce_short(
         save_dataclass(produced, output_dir / "meta.json")
 
         # ★ v0.1.2 — 디버그 모드: 자동편집 결과물 한 곳에 모아 비교 편하게.
-        # 끄려면 DEBUG_AUTO_OUTPUT_DIR = None 으로.
+        # 끄려면 config.debug_auto_output_dir = "" 또는 None 으로 (디버깅 탭에서 변경).
         # 원본 (output_dir/full.mp4) 은 그대로 두고 복사만.
         # CapCut 모드는 결과물이 .mp4 가 아니라 draft 폴더라서 자동 skip.
+        # ★ v1.9.3 — 호출 시점에 _resolve_debug_auto_output_dir() 재평가
+        #   (GUI 변경 즉시 반영 — config.json 매번 새로 읽음).
+        debug_path = _resolve_debug_auto_output_dir()
         if (
-            DEBUG_AUTO_OUTPUT_DIR
+            debug_path
             and full_mp4
             and full_mp4.suffix.lower() == ".mp4"
             and full_mp4.exists()
         ):
             try:
-                debug_dir = Path(DEBUG_AUTO_OUTPUT_DIR).expanduser()
+                debug_dir = Path(debug_path).expanduser()
                 debug_dir.mkdir(parents=True, exist_ok=True)
                 debug_dst = debug_dir / f"{output_dir.name}.mp4"
                 shutil.copy2(full_mp4, debug_dst)
