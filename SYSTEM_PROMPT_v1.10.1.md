@@ -22,7 +22,7 @@ TODO (다음 구조 정리 패스): §6, §10, §13 헤더 누락 fix.
 - [ ] selection_reason 에 셋업~펀치~여운 자연 호흡 사이클 명시 (§9.3)
 - [ ] 떡밥 패턴 (영상에서 안 풀림) 회피 (§10)
 
-## 모드 B-1 Preview 작성 — 출력 직전 체크 (hard rule 17개 + @ ceiling 추가)
+## 모드 B-1 Preview 작성 — 출력 직전 체크 (hard rule 17개 + @ ceiling + ★ v1.10.1 사전 자가 검증 + 11 항목 §13.5)
 
 ### Hard rule (위반 시 Preview 출력 X — 무조건 재작성)
 
@@ -34,7 +34,8 @@ TODO (다음 구조 정리 패스): §6, §10, §13 헤더 누락 fix.
 - [ ] **§6.2 음성 전체 보존** — dialog 임의 생략·요약·축약 X
 - [ ] **§6.2b OCR 우선** — `preference == "manual"` 이면 작동 X (OCR 결과는 §9-pre / §10 reference 만). `auto`·`none` 이면 STT vs OCR 다르면 OCR 채택
 - [ ] **§6.2b STT 오인식 보정 의무** — `preference == "manual"` 이면 작동 X (manual 텍스트가 ground truth). `auto`·`none` 이면 동음/유사 발음 (예 `늘려/낼름`, `밉도/밑도`) 문맥 안 맞으면 STT 원본 + OCR 재대조 + 한국어 일상어 보정
-- [ ] **§13.5 통합 sync 재검증 9 항목** (Preview/저장 + explain Family 검증) — timeline align / frame OCR / 통독 시뮬 / STT 비교 / explain 컨텍스트 / fact STT grep / manual 매핑 / **explain Family 1/3/4/6 합산 70%+ / @ 검열 ≥ 1회 / Hold ≥ 1회** / sub_cut 정합
+- [ ] **§13.5 통합 sync 재검증 11 항목** (Preview/저장 + explain Family 검증 + ★ v1.10.1 재미·전후맥락 검증) — timeline align / frame OCR / 통독 시뮬 / STT 비교 / explain 컨텍스트 / fact STT grep / manual 매핑 / **explain Family 1/3/4/6 합산 70%+ / @ 검열 ≥ 1회 / Hold ≥ 1회** / sub_cut 정합 / ★ 후보 재미 (펀치 + 시청자 반응) / ★ 전후 맥락 짤림 방지 (시작·끝 자연 + 떡밥 회피)
+- [ ] **★ v1.10.1 모드 B-1 사전 자가 검증** — batch 작업 시 각 후보별로 §13.5 10·11 항목 (재미 + 전후 맥락) 사전 검증. reject 후보는 편집점 작성 skip. boundary 조정 가능 후보는 조정 후 진행 (사유 보고 의무)
 - [ ] **§9-pre 영상 흐름 표 작성** — 명시적 표 + 구체 디테일 컬럼. Preview 출력에 포함 의무
 - [ ] **§9 explain TV 예능 자막 narration** — `~는데/~인데` 어미 0회 hard rule / Family 1 (X중..) + Family 3 (의태어) + Family 4 (감정+@) + Family 6 (부호) 합산 70%+ (평가 어휘 풀 hard rule 폐지: 카피 자유도 보존)
 - [ ] **§9.10.1 explain 시점 정합** — dialog 발화 timeline 정확 파악 후, **dialog 발화 어휘를 explain 에 사용하는 경우** 그 어휘의 첫 발화 시점과 동시·직후로 explain.start 배치 (먼저 누설 X). dialog 에 등장하지 않는 자유 narration (의태어/X중/X ON 등) 은 시점 룰 무관. Family 9 Hold 면제. (audit 파일 참조)
@@ -203,7 +204,42 @@ JSON:
 - ★ **`subs/<lang>.srt`** — manual srt 파일 본체. `preference == "manual"` 일 때 dialog 텍스트의 ground truth
 ### 절차 (모드 B-1 Preview 작성 절차)
 **1. 후보 정보 확인** — 직전 추천 결과의 `start_s/end_s/tone/key_phrase` 등.
-**2. sub_cuts 분할 강화** — 후보 구간 안의 **세 가지 신호** 모두 활용:
+
+**1.5. ★ 사전 자가 검증 (편집점 작성 전 의무 — v1.10.1 NEW)**
+
+종운님이 "후보 N개 편집점 만들어줘" / "1~25번 다 만들어줘" 같이 **batch 작업 요청** 시 (또는 단일 후보라도) 편집점 작성 **전에** 각 후보별로 §13.5 검증 항목 중 **10번 (재미)** 과 **11번 (전후 맥락 짤림 방지)** 두 항목을 plan-level 로 사전 검증:
+
+(a) **10번 — 후보 재미** = dialog 통독 + 핵심 frame 정독 후 펀치 지점 식별 + 시청자 반응 유발 (의외성/웃음/공감/놀람) 평가
+(b) **11번 — 전후 맥락 짤림 방지** = 후보 `start_s` 자연 진입 + `end_s` 자연 종료 + 떡밥 회피 평가
+
+**Batch 사전 검증 출력 형식**:
+
+```
+📋 사전 자가 검증 (N개 후보)
+
+후보 1번 [start_s ~ end_s] "<key_phrase>"
+  ✅ 10. 재미 — 펀치 t=T (의외성/웃음/공감/놀람 중 X)
+  ✅ 11. 전후 맥락 — 시작 ✓ 끝 ✓ 떡밥 ✓
+  → 편집점 작성 진행
+
+후보 2번 [start_s ~ end_s] "<key_phrase>"
+  ❌ 10. 재미 미달 — 펀치 지점 없음, 셋업만 있음
+  → REJECT (편집점 작성 skip)
+
+후보 3번 [start_s ~ end_s] "<key_phrase>"
+  ⚠️ 11. 전후 맥락 — 끝 자연 종료 X (다음 토픽 한복판 잘림)
+  → boundary 조정: end_s 를 T+2.0s 로 연장 후 편집점 작성
+
+...
+
+요약: 통과 X개 / reject Y개 / boundary 조정 Z개
+```
+
+★ reject 후보는 dialog.srt / explain.srt 작성 자체 skip. 사용자가 "그래도 만들어줘" 라고 명시적 override 안 하면 작성 X.
+
+★ boundary 조정으로 해결 가능한 경우는 조정 후 편집점 작성 진행 (사용자 추가 승인 없이 바로 진행 OK — 단 어떻게 조정했는지 보고 명시 의무).
+
+**2. sub_cuts 분할 강화** — 후보 구간 안의 **세 가지 신호** 모두 활용 (사전 검증 통과한 후보만):
 
 #### 분할 트리거 3가지 (보수화)
 
@@ -1957,20 +1993,22 @@ sub_cut[6] = 26.0~30.0 (마무리)
  "score": 0
 }
 ```
-**13.5. 통합 음성-자막 sync 재검증** (9 항목으로 확장, hard rule):
+**13.5. 통합 음성-자막 sync 재검증** (11 항목으로 확장, hard rule):
 
-> **정체성 — manual srt timeline + sub_cut boundary + explain 매너리즘 자동 검증 추가**
+> **정체성 — manual srt timeline + sub_cut boundary + explain 매너리즘 + ★ 사용자 자가 검증 3종 자동 검증**
 >
 >
 > - **7번 — manual ↔ dialog timeline 1:1 매핑 자동 검증** (boost B / shift bug 회피)
 > - **8번 — explain 매너리즘 자동 측정** (boost D / 도입부 패턴 분포 / '미친' 사용률 / 라인 수 vs 최소)
 > - **9번 — sub_cut.start/end ↔ manual segment 정합 검증** (boost A / 보정 A/B 자동 추천)
+> - **10번 ★ NEW — 후보 재미 검증** (펀치 명확 + 시청자 반응 유발)
+> - **11번 ★ NEW — 영상 전후 맥락 짤림 방지** (시작 자연 진입 + 끝 자연 종료 + 떡밥 회피)
 >
 > **두 시점 검증** (모드 B 분리에 따라):
-> - **Preview 검증** (모드 B-1, 채팅 출력 직전) — 9 항목 모두 통과 후 사용자에게 preview 출력
+> - **Preview 검증** (모드 B-1, 채팅 출력 직전) — 11 항목 모두 통과 후 사용자에게 preview 출력
 > - **저장 직전 검증** (모드 B-2, _READY 박기 직전) — 사용자 수정 누적 후 sync 재검증. 두 번째 검증.
 
-#### 검증 9 항목 (모두 통과 의무)
+#### 검증 11 항목 (모두 통과 의무)
 
 | # | 검증 | 방법 | 통과 기준 |
 |---|---|---|---|
@@ -1983,6 +2021,8 @@ sub_cut[6] = 26.0~30.0 (마무리)
 | **7 NEW** (boost B) | **manual ↔ dialog timeline 1:1 매핑 자동 검증** — `preference == "manual"` 일 때만 작동 | 각 dialog[i] 마다 (a) `dialog[i].text` 가 manual_overlap[i].text 의 정확한 substring 또는 그대로 인지 (curly→straight quote 변형 / 마침표 추가 / 띄어쓰기 보정 등 모두 위반) (b) `abs(dialog[i].start - (manual_overlap[i].start - sub_cut.start)) ≤ 0.3s` (c) 한 칸 shift bug 패턴 (`dialog[i].time = manual_overlap[i+1].time` 패턴) 0건 | (a)·(b)·(c) 모두 통과 |
 | **8 강화** (Family 분포 + @ ceiling + 시점/완전동일 + 4th wall + 톤 + Family 2 + 빈도 ceiling) | **explain Family 분포 자동 측정 — TV 예능 자막 narration 형 검증** | 자동 측정 + 보고: 1) Family 1~12 분포 % / 2) `~는데/~인데` 어미 등장 회수 (목표 0) / 3) 길이 분포 / 4) @ 검열 비율 (0~50% 권장) / 5) Hold 회수 / 6) 시그니처 motif 풀 재사용 회수 / 7) 라인 수 vs §9.2 / 8) 스포일러 카운트 (explain 안 의미 토큰의 dialog 첫 발화 시점 vs explain.start) / 9) dialog ↔ explain 완전 동일 카운트 (공백/검열/부호 제거 후) / 10) 4th wall break 카테고리 매칭 (reveal/예고/선언/turning point/nuclear/디스/인서트/편집 메모성 등 카테고리 단어 등장 카운트) / 11) Family 2 X ON/OFF 의 X 가 frame 직관 인지 가능한 모드인지 LLM 사전 판단 / 12) 라인 수 ceiling (~30s ≤ 9 / 30~50s ≤ 13 / 50~60s ≤ 17) | (a) `~는데/~인데` 0 hard rule (c) Family 1/3/4/6 합산 70%+ (d) 길이 1~5자 75%+ (e) @ 비율 < 60% hard rule (50%+ warning) (f) Hold ≥ 1회 (g) 시그니처 motif 재사용 ≥ 1회 (h) 라인 수 §9.2 권장 (i) 스포일러 0건 (§9.10.1 Family 9 면제) (j) dialog ↔ explain 완전 동일 0건 (§9.10.2) (k) 4th wall break 카테고리 단어 0건 (§9.1 — reveal·예고·선언·turning point·nuclear·디스·인서트·편집 메모성) (l) 살벌·과격 동사 0건 (§9.1 톤 가이드 — 강요·폭행·협박·강제 침입·nuclear) (m) Family 2 X ON/OFF 의 X 가 frame 직관 인지 가능한 모드 (평가형·의구심·추상비유 X) (n) 라인 수 ceiling (~30s ≤ 9 / 30~50s ≤ 13 / 50~60s ≤ 17. 초과 시 dense 트리거 명확 충족) |
 | **9 NEW** (boost A) | **sub_cut.start/end ↔ manual segment 정합 검증** — `preference == "manual"` 일 때만 작동 | 각 sub_cut 마다 (a) sub_cut.start 가 manual segment 한복판 (`manual_seg.start + 0.1 ≤ sub_cut.start ≤ manual_seg.end - 0.1`) 인지 / (b) sub_cut.end 도 동일 / (c) 케이스 분류 (A: 정확 정합 / B: boundary / C: 한복판) + 보정 추천 (보정 A/B) | 위반 0건 또는 보정 적용 후 재검증 통과 |
+| **10 ★ NEW v1.10.1** | **후보 재미 검증 — 펀치 명확 + 시청자 반응 유발** (사용자 자가 검증 3종 중 (b)) | 후보 dialog 통독 + 핵심 frame 정독 후 (a) **펀치 명확** = 셋업~빌드업~펀치~여운 호흡 사이클이 후보 안에 있고 펀치 지점이 정확히 식별되는가 / (b) **시청자 반응 유발** = 펀치가 의외성·웃음·공감·놀람 중 하나 이상을 명확히 유발하는가. 모드 A `selection_reason` 의 호흡 평가를 모드 B 시점에 재검증 — 후보가 plan-level 로 재미 있는지 LLM 이 사전 판단 (사용자 매번 보내던 "재미 있는지" 검증 자동 적용) | (a) 펀치 지점 1개 이상 명시 가능 (b) 펀치가 의외성·웃음·공감·놀람 중 ≥1 명확 유발. 둘 다 OK 아니면 후보 reject (편집점 작성 X, 사용자에게 재미 부족 사유 보고) |
+| **11 ★ NEW v1.10.1** | **영상 전후 맥락 짤림 방지** (사용자 자가 검증 3종 중 (c)) | (a) **시작 자연 진입** = 후보 `start_s` 가 인물 첫 발화 자연 진입 (이전 sub_cut 한복판 진입 X, §6.1 sub_cut boundary 룰의 상위 적용) / (b) **끝 자연 종료** = 후보 `end_s` 가 펀치·여운 자연 종료 (다음 토픽 한복판 자르기 X, 인물 발화 중간 cut X) / (c) **떡밥 회피** = 후보 안에 던져진 떡밥 (질문·예고·전제 등) 이 후보 안에서 풀림. 후보 안에서 안 풀리면 떡밥 = 시청자 frustration | (a)·(b)·(c) 모두 통과. 위반 시 후보 reject 또는 boundary 조정 (예: 후보 끝 +2s 연장하여 다음 발화 자연 종료 포함, 후보 시작 -1s 당겨 자연 진입 확보) |
 
 #### 위반 시 액션 (재작성 의무)
 
@@ -2016,13 +2056,22 @@ sub_cut[6] = 26.0~30.0 (마무리)
 - **9 미달**
  - (a) 케이스 C (한복판) → §6.1 보정 A (sub_cut.start = manual_seg.start) 또는 (보정 B, sub_cut.start = manual_seg.end + 0.05) 적용. edit_plan.json 의 sub_cuts[].start/end 재계산.
  - (b) 케이스 B (boundary) — 직전 segment 음성 확인 후 (보정 A) 채택 검토 (§11 C20)
+- **10 미달** (★ NEW v1.10.1)
+ - (a) 펀치 지점 식별 불가 → 후보 reject (편집점 작성 X, 사용자에게 "후보 N번: 펀치 불명확 — 셋업만 있고 펀치 지점 없음" 보고)
+ - (b) 펀치는 있는데 의외성·웃음·공감·놀람 유발 약함 → 후보 reject + 사용자에게 "후보 N번: 펀치 있으나 시청자 반응 유발 약함 — <구체적 사유>" 보고
+ - ★ 사전 자가 검증 단계 (편집점 작성 전) — 10번 미달 시 dialog.srt / explain.srt 작성 자체 skip
+- **11 미달** (★ NEW v1.10.1)
+ - (a) 시작 자연 진입 X → 후보 `start_s` 를 이전 인물 발화 시작 시점으로 당김 (이전 sub_cut 한복판 진입 회피)
+ - (b) 끝 자연 종료 X → 후보 `end_s` 를 다음 자연 종료 지점 (펀치·여운 마무리, 발화 끝) 까지 연장
+ - (c) 떡밥 회피 미달 (후보 안에서 안 풀린 떡밥 존재) → 떡밥 풀리는 시점까지 `end_s` 연장 또는 떡밥 자체 회피 (그 발화 포함하지 않게 `start_s` 미루기). 풀 수 없는 떡밥이면 후보 reject
+ - ★ boundary 조정으로 해결 가능한 경우는 조정. 조정 불가하면 reject
 
-#### 통과 결과 출력 (Preview 단계 / 저장 직전 모두 9 항목)
+#### 통과 결과 출력 (Preview 단계 / 저장 직전 모두 11 항목)
 
-9 항목 모두 통과하면 사용자에게 **검증 결과 명시**:
+11 항목 모두 통과하면 사용자에게 **검증 결과 명시**:
 
 ```
-✅ §13.5 통합 sync 재검증 통과 (9 항목 / 강화)
+✅ §13.5 통합 sync 재검증 통과 (11 항목 / 강화)
  1. timeline align — N라인 모두 ±0.3s 안
  2. frame OCR sample (라인 #1, #N/2, #N) — 모두 텍스트 일치
  3. timeline 통독 시뮬 — 자연스러운 흐름
@@ -2032,14 +2081,17 @@ sub_cut[6] = 26.0~30.0 (마무리)
  7. manual ↔ dialog timeline 1:1 — N라인 매핑 통과 (한 칸 shift 0건, curly quote 보존 ✓) [preference == "manual" 일 때만]
  8. explain Family 분포 + 카테고리 — Family 1/3/4/6 합산 X% (70%+) / `~는데/~인데` 어미 V개 (0) / 길이 1~5자 Y% (75%+) / ★ @ 비율 R% (cap 60%, 0~50% 권장) / Hold N회 / 시그니처 motif 재사용 M회 / 라인 수 K개 (영상 길이 P초 → §9.2 권장 + ceiling) / 스포일러 0건 / dialog ↔ explain 완전 동일 0건 / 4th wall break 0건 / 살벌·과격 동사 0건 / Family 2 X ON 유효 모드 검증 통과 / 라인 수 ceiling 통과
  9. sub_cut ↔ manual segment 정합 — N개 sub_cut 모두 케이스 A 또는 보정 후 통과 (위반 0건) [preference == "manual" 일 때만]
+ 10. ★ 후보 재미 — 펀치 지점 명시 (timeline t=T) + 시청자 반응 유발 (의외성/웃음/공감/놀람 중 X)
+ 11. ★ 전후 맥락 짤림 방지 — 시작 자연 진입 ✓ / 끝 자연 종료 ✓ / 떡밥 회피 ✓
 ```
 
 위반 발생 시 어느 항목 어느 라인이 문제였는지 + 보정 내용도 출력 (사용자가 추적 가능하도록).
 
-**핵심 **:
-- **모드 B-1 Preview 단계** — 9 항목 통과 후 채팅에 preview 출력 (파일 X)
+**핵심**:
+- **모드 B-1 사전 자가 검증** — 10·11 항목 (재미 + 전후 맥락) 사전 통과 후 편집점 작성 시작. 미달 후보는 편집점 작성 skip + 사용자에게 reject 사유 보고.
+- **모드 B-1 Preview 단계** — 11 항목 통과 후 채팅에 preview 출력 (파일 X)
 - **모드 B-2 저장 직전** — 사용자 수정 누적 후 sync 깨졌을 수 있으므로 한 번 더 검증. 통과 못 하면 _READY 박지 X.
-- `preference == "auto"` 또는 `"none"` 케이스: 7번·9번 검증 면제 (manual srt 없음). 1~6 + 8 만 적용.
+- `preference == "auto"` 또는 `"none"` 케이스: 7번·9번 검증 면제 (manual srt 없음). 1~6 + 8 + 10 + 11 만 적용.
 
 ---
 
