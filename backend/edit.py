@@ -1285,6 +1285,60 @@ class FfmpegRenderer(Renderer):
                     step=step, percent=percent, message=message, elapsed_s=elapsed,
                 ))
 
+        # ★ v1.10.2 — edit_plan / explain build-time validator hook
+        # SYSTEM_PROMPT v1.10.2 의 hard rule (title 14자+ 줄바꿈, explain.start
+        # snap, 인물명 환각 등) 을 코드 차원에서 자동 검증 + auto-fix (title).
+        # 위반은 warning emit (렌더 계속) — auto-fix 만 plan mutate.
+        try:
+            from backend.edit_plan_validator import (
+                auto_fix_title as _v10_auto_fix_title,
+                validate_edit_plan as _v10_validate_edit_plan,
+            )
+            from backend.explain_validator import (
+                parse_srt as _v10_parse_srt,
+                validate_explain as _v10_validate_explain,
+            )
+            from backend.schema import to_dict as _v10_to_dict
+
+            _v10_plan_dict = _v10_to_dict(plan)
+            _v10_title_fixes = _v10_auto_fix_title(_v10_plan_dict)
+            for _rule, _before, _after in _v10_title_fixes:
+                emit(
+                    "validator_fix", 0,
+                    f"📐 v1.10.2 auto-fix: {_rule} — {_before} → {_after}",
+                )
+                # plan 객체 mutate (title.text + line_count)
+                plan.template.title_text = _v10_plan_dict["template"]["title_text"]
+                plan.template.title_line_count = _v10_plan_dict["template"]["title_line_count"]
+
+            _v10_dialog_path = output_dir / "dialog.srt"
+            _v10_explain_path = output_dir / "explain.srt"
+            _v10_source_dir = None
+            if plan.source and plan.source.analysis_dir:
+                _v10_source_dir = Path(plan.source.analysis_dir)
+            if _v10_dialog_path.exists():
+                _v10_dialog_cues = _v10_parse_srt(_v10_dialog_path)
+                _v10_plan_result = _v10_validate_edit_plan(
+                    _v10_plan_dict, _v10_dialog_cues,
+                    _v10_source_dir, auto_fix=False,
+                )
+                for _sev, _rule, _msg in _v10_plan_result["violations"]:
+                    emit(
+                        "validator_warning", 0,
+                        f"⚠️ v1.10.2 [{_sev}] {_rule} — {_msg}",
+                    )
+                if _v10_explain_path.exists():
+                    _v10_ex_result = _v10_validate_explain(
+                        _v10_explain_path, _v10_dialog_path, _v10_source_dir,
+                    )
+                    for _sev, _rule, _idx, _t, _msg in _v10_ex_result["violations"]:
+                        emit(
+                            "validator_warning", 0,
+                            f"⚠️ v1.10.2 [{_sev}] {_rule} cue#{_idx} @{_t:.1f}s — {_msg}",
+                        )
+        except Exception as _v10_err:  # noqa: BLE001  validator 실패는 렌더 막지 X
+            emit("validator_error", 0, f"v1.10.2 validator 실패 (continuing): {_v10_err}")
+
         # 1. 폰트
         emit("font", 0, "한글 폰트 확인 중")
         ensure_font(font_path)
