@@ -450,6 +450,14 @@ FOOTER_Y = 1840             # 1840 ~ 1920: 출처
 # Sub-cut 추출 시 영상 1:1 사이즈 (scale 후)
 CUT_SQUARE_SIZE = 1080
 
+# ★ v1.10.x — sub_cut dur safety net.
+# 코워크 편집점 작성 시 인접 sub_cut 둘 다에 같은 timestamp 박는 algorithmic
+# 실수 (sub_cut[N].end = sub_cut[N+1].start = sub_cut[N+1].end) 결과로
+# 0/음수 dur stray empty sub_cut 발생 케이스 안전망. ffmpeg `-ss A -to A`
+# 받으면 `-to value smaller than -ss; aborting` fatal → 전체 편집 실패.
+# 50ms (0.05s) 미만은 의미 있는 컷이 아니라 판단하고 자동 skip.
+MIN_SUBCUT_DUR_S = 0.05
+
 
 def render_template_png(
     plan: EditPlan,
@@ -838,6 +846,20 @@ def _ffmpeg_extract_subcut(
     """
     if is_cancelled and is_cancelled():
         raise EditCancelled()
+
+    # ★ v1.10.x — invariant. caller 가 사전 필터 안 했을 때 defense in depth.
+    # ffmpeg 가 `-ss A -to A` 받으면 input 열기 전에 fatal reject 라 차라리
+    # 명확한 EditError 던지는 게 디버깅 편함. caller 측 (FfmpegRenderer /
+    # CapCutDraftAdapter) 에서 이미 같은 임계로 사전 skip 하므로 정상 흐름엔
+    # 트리거 안 됨. 직접 호출 / 테스트 코드 등에서만 트리거.
+    dur = end_s - start_s
+    if dur < MIN_SUBCUT_DUR_S:
+        raise EditError(
+            f"sub-cut dur 비정상 (start={start_s:.3f}, end={end_s:.3f}, "
+            f"dur={dur:.3f}s). 최소 {MIN_SUBCUT_DUR_S}s 이상 필요. "
+            f"edit_plan.json 의 sub_cuts 확인 — 인접 sub_cut 의 end/start "
+            f"timestamp 중복 가능성."
+        )
 
     # v1.6 — apply_focus_box=False (capcut export 모드) 면 영상 원본 비율 유지
     if apply_focus_box:
@@ -1286,6 +1308,31 @@ class FfmpegRenderer(Renderer):
                 end=plan.shorts.end_s,
                 duration=plan.shorts.duration_s,
             )]
+
+        # ★ v1.10.x — stray sub_cut (dur < MIN_SUBCUT_DUR_S) 사전 필터.
+        # 코워크 편집점 작성 시 인접 sub_cut 둘 다에 같은 timestamp 박는
+        # 실수 패턴 (sub_cut[N].end = sub_cut[N+1].start = sub_cut[N+1].end)
+        # 결과로 0/음수 dur stray sub_cut 발생. ffmpeg `-to value smaller
+        # than -ss` fatal 회피 + 나머지 sub_cuts 정상 처리 (batch 한 줄이
+        # 전체 reject 막음). cut_paths list 에 안 들어가서 concat 도 자동 skip.
+        _orig_count = len(sub_cuts)
+        _filtered: list[EditPlanSubCut] = []
+        for _c in sub_cuts:
+            _dur = _c.end - _c.start
+            if _dur < MIN_SUBCUT_DUR_S:
+                emit(
+                    "subcut_skip", 0,
+                    f"⚠️ sub_cut[{_c.index}] skip — dur={_dur:.3f}s "
+                    f"(stray, start={_c.start:.3f} end={_c.end:.3f})",
+                )
+                continue
+            _filtered.append(_c)
+        if not _filtered:
+            raise EditError(
+                f"모든 sub_cut 이 stray (dur < {MIN_SUBCUT_DUR_S}s, "
+                f"{_orig_count}개) — edit_plan.json 의 sub_cuts 전체 확인 필요"
+            )
+        sub_cuts = _filtered
 
         # v1.4 — face_clusters 로드 (wide shot 자동 hide_caption 안전망용)
         face_clusters_for_render: dict | None = None
@@ -1837,6 +1884,29 @@ class CapCutDraftAdapter(Renderer):
                 index=1, start=plan.shorts.start_s, end=plan.shorts.end_s,
                 duration=plan.shorts.duration_s,
             )]
+
+        # ★ v1.10.x — stray sub_cut (dur < MIN_SUBCUT_DUR_S) 사전 필터.
+        # FfmpegRenderer 와 동일 안전망. CapCut add_video 도 zero-dur segment
+        # 받으면 timeline 0초 segment 박혀 후속 자막 timeline shift 어긋남.
+        # 필터된 sub_cuts 는 아래 _remap_srt_to_timeline 에도 그대로 전달됨.
+        _orig_count = len(sub_cuts)
+        _filtered: list[EditPlanSubCut] = []
+        for _c in sub_cuts:
+            _dur = _c.end - _c.start
+            if _dur < MIN_SUBCUT_DUR_S:
+                emit(
+                    "subcut_skip", 0,
+                    f"⚠️ sub_cut[{_c.index}] skip — dur={_dur:.3f}s "
+                    f"(stray, start={_c.start:.3f} end={_c.end:.3f})",
+                )
+                continue
+            _filtered.append(_c)
+        if not _filtered:
+            raise EditError(
+                f"모든 sub_cut 이 stray (dur < {MIN_SUBCUT_DUR_S}s, "
+                f"{_orig_count}개) — edit_plan.json 의 sub_cuts 전체 확인 필요"
+            )
+        sub_cuts = _filtered
 
         timeline_pos = 0.0
         for i, c in enumerate(sub_cuts, 1):
