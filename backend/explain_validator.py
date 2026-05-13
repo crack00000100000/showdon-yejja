@@ -2,15 +2,15 @@
 """
 backend/explain_validator.py — explain.srt build-time validator (v1.10.2)
 
-v1.10.0 audit (2026-05-13) 발견 결함을 build pipeline 에서 자동 검증.
-SYSTEM_PROMPT v1.10.2 의 hard rule 들 (LLM 산출물이 통과한 룰) 을 코드 차원에서 강제.
+SYSTEM_PROMPT hard rule 들 (LLM 산출물이 통과한 룰) 을 코드 차원에서 강제.
 
 검증 항목:
-1. explain.start = dialog.start ±200ms snap (§9.10.1)
-2. cue duration 정수 round 패턴 감지 (§9.10.1)
-3. 편집·제작 메모성 narration (§9.1 — 인서트 따주세요 등)
-4. `(?)` `(?????)` 컨텍스트 검증 (§9.10.3 — cue 시점 ±2초 dialog 의문/놀람 여부)
-5. 인물명 환각 grep (§9.5 — cast_list / dialog / OCR / source_meta 에 등장 여부)
+1. 편집·제작 메모성 narration (§9.1 — 인서트 따주세요 등)
+2. `(?)` `(?????)` 컨텍스트 검증 (§9.10.3 — cue 시점 ±2초 dialog 의문/놀람 여부)
+3. 영어 외부 단어 grep (§9.1 — dialog/cast/OCR/source 등장 X 면 위반)
+4. 인물명 환각 grep (§9.5 — cast_list / dialog / OCR / source_meta 에 등장 여부)
+
+폐기: explain.start ±200ms snap / cue duration 정수 round 패턴 (CapCut 후처리 위임).
 
 호출: validate_explain(explain_path, dialog_path, source_dir=None) -> dict
   - source_dir: analysis 폴더 경로 (cast_list / OCR / source_meta 참조용, optional)
@@ -117,50 +117,6 @@ def _strip_text(t: str) -> str:
     return t
 
 
-def check_start_snap(
-    explain_cues: list[Cue],
-    dialog_cues: list[Cue],
-    tolerance_s: float = 0.2,
-) -> list[tuple[str, str, int, float, str]]:
-    """§9.10.1 — 모든 explain cue 의 start 가 dialog cue start 와 ±200ms align."""
-    violations = []
-    if not dialog_cues:
-        return violations
-    dialog_starts = [c.start for c in dialog_cues]
-    for ex in explain_cues:
-        nearest = min(dialog_starts, key=lambda v: abs(v - ex.start))
-        gap = abs(ex.start - nearest)
-        if gap > tolerance_s:
-            violations.append((
-                "hard", "9.10.1_snap",
-                ex.index, ex.start,
-                f"explain start {ex.start:.2f}s 가 dialog start 와 {gap*1000:.0f}ms 어긋남 "
-                f"(가장 가까운 dialog start = {nearest:.2f}s). ±{tolerance_s*1000:.0f}ms snap 필요"
-            ))
-    return violations
-
-
-def check_duration_round_pattern(
-    explain_cues: list[Cue],
-) -> list[tuple[str, str, int, float, str]]:
-    """§9.10.1 — cue duration 이 정수 round 패턴 (모든 cue 가 2.5/3.0/4.0 같은 round) 인지 감지."""
-    violations = []
-    durations = [c.end - c.start for c in explain_cues]
-    if len(durations) < 3:
-        return violations
-    # 모든 duration 이 0.5초 단위 round 인지 (즉 dur * 2 가 정수에 ±0.05 안)
-    round_count = sum(1 for d in durations if abs(d * 2 - round(d * 2)) < 0.05)
-    ratio = round_count / len(durations)
-    if ratio > 0.9 and len(set(round(d, 2) for d in durations)) <= 3:
-        violations.append((
-            "soft", "9.10.1_duration_round",
-            -1, 0.0,
-            f"explain cue duration {ratio*100:.0f}% 가 0.5초 round 패턴 "
-            f"({round_count}/{len(durations)}). dialog 발화 길이 + 0.5초 fade 로 동적 권장"
-        ))
-    return violations
-
-
 def check_editor_memo(
     explain_cues: list[Cue],
 ) -> list[tuple[str, str, int, float, str]]:
@@ -220,6 +176,53 @@ def _extract_name_candidates(text: str) -> list[str]:
         for m in re.finditer(rf"([가-힣]{{2,4}})\s*{honor}", cleaned):
             candidates.append(m.group(1))
     return candidates
+
+
+def check_english_outside_dialog(
+    explain_cues: list[Cue],
+    dialog_cues: list[Cue],
+    source_dir: Optional[Path] = None,
+) -> list[tuple[str, str, int, float, str]]:
+    """§9.1 v1.10.3 — explain 안 영어 단어 (3자+) 가 dialog/cast/OCR/source 에 등장 X 면 위반.
+
+    면제: ON/OFF 2자 motif 는 [A-Za-z]{3,} 룰 자체로 제외.
+    """
+    violations = []
+    truth_text = " ".join(c.text for c in dialog_cues).lower()
+    cast_names: set[str] = set()
+    if source_dir is not None and source_dir.exists():
+        # cast_list / face_clusters / source_meta / OCR 텍스트 합치기
+        for fname in ("cast_list.json", "face_clusters.json", "ocr_local.json", "ocr_candidates.json"):
+            p = source_dir / fname
+            if p.exists():
+                try:
+                    truth_text += " " + p.read_text(encoding="utf-8").lower()
+                except OSError:
+                    pass
+        sm_path = source_dir.parent / "원본" / "source_meta.json"
+        if sm_path.exists():
+            try:
+                sm = json.loads(sm_path.read_text(encoding="utf-8"))
+                truth_text += " " + str(sm.get("uploader", "")).lower()
+                truth_text += " " + str(sm.get("description", "")).lower()
+                truth_text += " " + str(sm.get("title", "")).lower()
+            except (json.JSONDecodeError, OSError):
+                pass
+
+    # [A-Za-z]{3,} 단어 추출 (cue 텍스트만)
+    eng_pattern = re.compile(r"[A-Za-z]{3,}")
+    for ex in explain_cues:
+        words = eng_pattern.findall(ex.text)
+        for word in words:
+            if word.lower() not in truth_text:
+                violations.append((
+                    "hard", "9.1_english_outside",
+                    ex.index, ex.start,
+                    f"영어 단어 {word!r} 이 dialog/cast/OCR/source 어디에도 없음 — 외국물 톤. "
+                    f"한국어 변환 의무 (예: reveal→폭로/공개/발사 / escalation→격화 / "
+                    f"turning point→전환점 / nuclear→대박 / ZERO→0점). cue: {ex.text.strip()!r}"
+                ))
+    return violations
 
 
 def check_person_name_hallucination(
@@ -296,10 +299,9 @@ def validate_explain(
     dialog_cues = parse_srt(dialog_path)
 
     violations: list[tuple[str, str, int, float, str]] = []
-    violations.extend(check_start_snap(explain_cues, dialog_cues))
-    violations.extend(check_duration_round_pattern(explain_cues))
     violations.extend(check_editor_memo(explain_cues))
     violations.extend(check_question_mark_context(explain_cues, dialog_cues))
+    violations.extend(check_english_outside_dialog(explain_cues, dialog_cues, source_dir))
     violations.extend(check_person_name_hallucination(explain_cues, dialog_cues, source_dir))
 
     durations = [c.end - c.start for c in explain_cues]
