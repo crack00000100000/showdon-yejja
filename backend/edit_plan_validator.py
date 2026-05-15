@@ -28,7 +28,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 # 자동 줄바꿈 트리거 길이 (큰따옴표 제거 후 자수)
-TITLE_WRAP_THRESHOLD = 14
+TITLE_WRAP_THRESHOLD = 16  # v1.10.5 — 간결 훅 룰. 5~12자 target, 16자+ 만 두 줄
 
 
 def _strip_quotes(s: str) -> str:

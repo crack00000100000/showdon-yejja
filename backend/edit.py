@@ -459,6 +459,76 @@ CUT_SQUARE_SIZE = 1080
 MIN_SUBCUT_DUR_S = 0.05
 
 
+def _split_runs_by_emoji(text: str) -> list[tuple[str, bool]]:
+    """텍스트를 비-BMP 이모지 run vs 일반 run 으로 분할.
+
+    Returns: [(segment, is_emoji), ...] — 인접한 같은 종류 char 는 합쳐짐.
+
+    PIL ImageFont 는 fallback 자동 X — draw.text 한 폰트만. 그래서 비-BMP
+    이모지 글자만 별도 emoji 폰트로 그리려면 segment 분할 필요.
+    """
+    if not text:
+        return []
+    runs: list[tuple[str, bool]] = []
+    cur_chars: list[str] = []
+    cur_emoji: Optional[bool] = None
+    for ch in text:
+        is_emoji = ord(ch) > 0xFFFF
+        if cur_emoji is None:
+            cur_emoji = is_emoji
+            cur_chars.append(ch)
+        elif is_emoji == cur_emoji:
+            cur_chars.append(ch)
+        else:
+            runs.append((''.join(cur_chars), cur_emoji))
+            cur_chars = [ch]
+            cur_emoji = is_emoji
+    if cur_chars:
+        runs.append((''.join(cur_chars), bool(cur_emoji)))
+    return runs
+
+
+def _draw_text_with_emoji_fallback(
+    draw,
+    text: str,
+    x: int,
+    y: int,
+    main_font,
+    emoji_font,
+    fill,
+    align_center_x: Optional[int] = None,
+) -> int:
+    """비-BMP 이모지를 emoji 폰트로 fallback 하며 텍스트 그리기.
+
+    Args:
+        align_center_x: None 이면 (x, y) 좌상단. 값 주면 그 x 가 중심이 되도록 정렬.
+
+    Returns: 마지막 cursor x.
+    """
+    runs = _split_runs_by_emoji(text)
+    if not runs:
+        return x
+    # 각 run width 측정
+    measured: list[tuple[str, bool, int]] = []
+    for seg, is_emoji in runs:
+        font = emoji_font if (is_emoji and emoji_font is not None) else main_font
+        try:
+            bbox = draw.textbbox((0, 0), seg, font=font)
+            w = bbox[2] - bbox[0]
+        except Exception:
+            w = len(seg) * 32
+        measured.append((seg, is_emoji, w))
+    total_w = sum(w for _, _, w in measured)
+    if align_center_x is not None:
+        x = max(20, align_center_x - total_w // 2)
+    cursor = x
+    for seg, is_emoji, w in measured:
+        font = emoji_font if (is_emoji and emoji_font is not None) else main_font
+        draw.text((cursor, y), seg, fill=fill, font=font)
+        cursor += w
+    return cursor
+
+
 def render_template_png(
     plan: EditPlan,
     channel: ChannelConfig,
@@ -511,6 +581,20 @@ def render_template_png(
         small_font = ImageFont.load_default()
         footer_font = ImageFont.load_default()
 
+    # ★ 비-BMP 이모지 fallback 폰트 (Noto Emoji 흑백). font_path 와 같은 폴더의
+    # NotoEmoji-VariableFont_wght.ttf. PIL 은 draw.text 한 폰트만 받기 때문에
+    # _inject_emoji_fontname (ASS 자막용) 같은 inline override 불가 →
+    # _draw_text_with_emoji_fallback 으로 segment 분할 + 폰트 분기.
+    title_emoji_font = footer_emoji_font = None
+    if font_path:
+        emoji_path = Path(font_path).parent / NOTO_EMOJI_FILENAME
+        if emoji_path.exists():
+            try:
+                title_emoji_font = ImageFont.truetype(str(emoji_path), 64)
+                footer_emoji_font = ImageFont.truetype(str(emoji_path), 32)
+            except Exception:
+                pass
+
     # === 채널 헤더 === (좌상단 — 슬림하게)
     icon_size = 76
     header_y = 24
@@ -550,28 +634,29 @@ def render_template_png(
             if not line:
                 title_y += line_h
                 continue
-            try:
-                bbox = draw.textbbox((0, 0), line, font=title_font)
-                tw = bbox[2] - bbox[0]
-            except Exception:
-                tw = len(line) * 32
-            x = max(20, (canvas_w - tw) // 2)
-            # ★ v1.9.2 — 검정 배경 → 흰 글씨
-            draw.text((x, title_y), line, fill=(255, 255, 255, 255), font=title_font)
+            # ★ 비-BMP 이모지 fallback — Noto Emoji 흑백 폰트로 그리는 segment 분할
+            _draw_text_with_emoji_fallback(
+                draw, line,
+                x=0, y=title_y,
+                main_font=title_font,
+                emoji_font=title_emoji_font,
+                fill=(255, 255, 255, 255),
+                align_center_x=canvas_w // 2,
+            )
             title_y += line_h
 
     # === 출처 footer === (가운데)
     footer_text = plan.footer.source_text or ""
     if footer_text:
-        try:
-            bbox = draw.textbbox((0, 0), footer_text, font=footer_font)
-            tw = bbox[2] - bbox[0]
-        except Exception:
-            tw = len(footer_text) * 16
-        x = max(20, (canvas_w - tw) // 2)
-        # ★ v1.9.2 — 검정 배경 → 밝은 회색 글씨
-        draw.text((x, FOOTER_Y + 16), footer_text,
-                  fill=(200, 200, 200, 255), font=footer_font)
+        # ★ 비-BMP 이모지 fallback (footer 에도 적용 — 채널명 이모지 안전망)
+        _draw_text_with_emoji_fallback(
+            draw, footer_text,
+            x=0, y=FOOTER_Y + 16,
+            main_font=footer_font,
+            emoji_font=footer_emoji_font,
+            fill=(200, 200, 200, 255),
+            align_center_x=canvas_w // 2,
+        )
 
     img.save(out_path, "PNG")
     return out_path, (video_zone_x, video_zone_y, video_zone_w, video_zone_h)
