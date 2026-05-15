@@ -459,6 +459,52 @@ CUT_SQUARE_SIZE = 1080
 MIN_SUBCUT_DUR_S = 0.05
 
 
+_SANDBOX_PATH_RE = re.compile(r"^/sessions/[^/]+/mnt/(?:showdon/)?yejjas/")
+
+
+def _v106_normalize_source_path(p: str, plan_dir: Path, *, kind: str) -> str:
+    """edit_plan.source.{video_path,analysis_dir} 의 코워크 sandbox path / URL / tilde 자동 변환.
+
+    Args:
+        p: 원본 path 문자열 (잘못된 형식 가능)
+        plan_dir: edit_plan.json 의 부모 폴더 (= 편집점/<shorts>/). plan_dir.parent.parent 가 회차 폴더
+        kind: "video" 또는 "analysis_dir"
+
+    Returns: 정상화된 macOS 절대 경로
+    """
+    if not p:
+        return p
+    # 1. sandbox path → /Users/joel/showdon/yejjas/
+    if _SANDBOX_PATH_RE.match(p):
+        return _SANDBOX_PATH_RE.sub("/Users/joel/showdon/yejjas/", p)
+    # 2. URL → 회차 폴더 안 원본 mp4 또는 분석 폴더
+    if p.startswith("http://") or p.startswith("https://"):
+        episode_dir = plan_dir.parent.parent  # 편집점 부모 = 회차 폴더
+        if kind == "video":
+            origin = episode_dir / "원본"
+            if origin.exists():
+                mp4s = list(origin.glob("*.mp4"))
+                if mp4s:
+                    macos = str(mp4s[0]).replace(
+                        "/sessions/wonderful-amazing-noether/mnt/showdon/",
+                        "/Users/joel/showdon/",
+                    )
+                    return macos
+        elif kind == "analysis_dir":
+            analysis = episode_dir / "분석"
+            if analysis.exists():
+                macos = str(analysis).replace(
+                    "/sessions/wonderful-amazing-noether/mnt/showdon/",
+                    "/Users/joel/showdon/",
+                )
+                return macos
+    # 3. tilde → 절대 (Path.expanduser 가 ~/ 처리하지만 macOS 외 환경 안전망)
+    if p.startswith("~/"):
+        return "/Users/joel" + p[1:]
+    # 4. 정상 path — 그대로
+    return p
+
+
 def _split_runs_by_emoji(text: str) -> list[tuple[str, bool]]:
     """텍스트를 비-BMP 이모지 run vs 일반 run 으로 분할.
 
@@ -2404,6 +2450,19 @@ def produce_short(
         raise EditError(f"edit_plan.json 없음: {plan_path}")
 
     plan = load_dataclass(EditPlan, plan_path)
+
+    # ★ v1.10.6 source path safety net — 코워크 sandbox path / URL / tilde 자동 변환
+    # 패턴: /sessions/<session>/mnt/(showdon/)?yejjas/ → /Users/joel/showdon/yejjas/
+    #       https://www.youtube.com/... → plan_dir.parent.parent/원본/<basename>.mp4
+    #       ~/showdon/... → /Users/joel/showdon/...
+    # 코워크 챗 마다 sandbox path 다르고 본인이 작성한 edit_plan 의 source 경로가
+    # 그 sandbox 의 mount path 라서 macOS .app 은 못 찾음. 자동 정리.
+    plan.source.video_path = _v106_normalize_source_path(
+        plan.source.video_path, plan_dir, kind="video",
+    )
+    plan.source.analysis_dir = _v106_normalize_source_path(
+        plan.source.analysis_dir, plan_dir, kind="analysis_dir",
+    )
 
     source_video = Path(plan.source.video_path).expanduser()
     if not source_video.exists():

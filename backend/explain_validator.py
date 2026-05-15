@@ -210,10 +210,15 @@ def check_english_outside_dialog(
                 pass
 
     # [A-Za-z]{3,} 단어 추출 (cue 텍스트만)
+    # 면제 white list: ON/OFF 시그니처 motif (SYSTEM_PROMPT §9.1)
+    # ON 은 2자라 [A-Za-z]{3,} 룰 자체 제외, OFF 는 3자라 명시 white list
     eng_pattern = re.compile(r"[A-Za-z]{3,}")
+    WHITELIST = {"OFF"}
     for ex in explain_cues:
         words = eng_pattern.findall(ex.text)
         for word in words:
+            if word.upper() in WHITELIST:
+                continue
             if word.lower() not in truth_text:
                 violations.append((
                     "hard", "9.1_english_outside",
