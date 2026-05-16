@@ -266,9 +266,23 @@ def check_person_name_hallucination(
         if cast_path.exists():
             try:
                 cast_data = json.loads(cast_path.read_text(encoding="utf-8"))
-                for entry in cast_data.get("clusters", []) if isinstance(cast_data, dict) else cast_data:
+                # ★ v1.10.9 — entries[] (새 schema) 우선, clusters[] (legacy) fallback, list 도 graceful
+                if isinstance(cast_data, dict):
+                    cast_entries = (
+                        cast_data.get("entries")
+                        or cast_data.get("clusters")
+                        or []
+                    )
+                else:
+                    cast_entries = cast_data if isinstance(cast_data, list) else []
+                for entry in cast_entries:
                     if isinstance(entry, dict) and entry.get("name"):
-                        cast_names.add(entry["name"])
+                        # "unknown" / "게스트" 같은 fallback 은 ground truth 풀에서 제외
+                        # (인물명 grep 환각 차단 의미 약함)
+                        name = entry["name"]
+                        if name.lower() in ("unknown", "?", ""):
+                            continue
+                        cast_names.add(name)
                         if entry.get("aliases"):
                             cast_names.update(entry["aliases"])
             except (json.JSONDecodeError, OSError):

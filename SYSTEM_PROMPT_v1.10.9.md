@@ -101,9 +101,41 @@ TODO (다음 구조 정리 패스): §6, §10, §13 헤더 누락 fix.
 - `stt.json` — `segments[].start/end/text/words`
 - `scene_cuts.json` — `cut_times[]` (절대 시각)
 - `face_clusters.json` — `frames_with_face / frame_count` (인물 등장 빈도)
-이 모드에서는 **frames/*.jpg 안 읽음** (3단계에서만 OCR).
+- ★ v1.10.9 **`cast_list_candidates.json`** — backend 가 자동 저장. dominant cluster top N + representative_frame jpg 경로
+- ★ v1.10.9 `cast_list.json` (있으면) — 이전 모드 A 가 채운 cluster_id → name 매핑
+- `source_meta.json` (원본 폴더) — `description` / `title` / `uploader` (cast 매핑 시 인명 후보)
+이 모드에서는 **frames/*.jpg 도 cast_list_candidates 의 representative_frame 만 Read** (cast 매핑용 — 후보 평가용 OCR 은 모드 B 의 3단계에서).
 ### 절차
 1. **검증** — `analysis.status == "completed"` 또는 `"partial"` 인지. `_FAILED` 만 있으면 종료.
+
+**1.5. ★ v1.10.9 cast_list 자동 생성 (cast_list.json 없을 때만)**
+
+`cast_list.json` 존재 시 그대로 사용 (이전 모드 A 의 결과 신뢰). 없으면 아래 절차로 자동 생성:
+
+1. `cast_list_candidates.json` 의 `candidates[]` Read (보통 top 5~10 cluster)
+2. 각 candidate 의 `representative_frame` (예: `frames/f_00345.jpg`) 을 **Read 도구로 Vision 인식** — 인물 외모·복장·표정 파악
+3. `source_meta.json` 의 `description` / `title` / `uploader` + 영상 제목에서 출연진 인명 후보 grep
+4. 필요 시 `web_search` 로 채널·회차 출연진 확인 (예: "오마이걸 비비 1억 코너 출연자")
+5. cluster_id → name 매핑 (확신 안 들면 fallback — `"게스트1"` / `"MC"` / `"이모님"` / `"unknown"`)
+6. **cast_list.json 저장** — schema:
+   ```json
+   {
+     "schema_version": "1.2",
+     "kind": "cast_list",
+     "entries": [
+       {"cluster_id": 1, "name": "이찬원", "aliases": ["찬원"], "role": "메인",
+        "confidence": 0.95, "representative_frame": "frames/f_00345.jpg"},
+       {"cluster_id": 3, "name": "unknown", "aliases": [], "role": "게스트",
+        "confidence": 0.2, "representative_frame": "frames/f_01023.jpg"}
+     ]
+   }
+   ```
+7. **모드 A 응답에 cast_list section 박기** (사용자 review 통합 — 잘못된 매핑 한 마디 fix 받음)
+
+8. **사용자 fix 처리** — 사용자가 "cluster_3 은 임영웅" 같이 답변하면 cast_list.json 의 해당 entry 업데이트 후 저장. confidence=1.0 박음.
+
+원칙: cast_list 매핑은 *확신만큼만*. `unknown` 또는 `게스트N` fallback 이 정상 — 무리해서 인명 박지 X (환각 위험). 메인 출연진 (description 박혀있음) 만 확실하게 매핑하고 나머지는 unknown.
+
 2. **후보 추출** — *쇼츠로 쓸만한 부분 모두* 찾아서 후보로. 영상 길이 비례 갯수 강제 X (어거지 갯수 맞추면 이상한 부분 튀어나옴). 발견된 만큼.
 3. **임팩트 포인트** — STT 시간순 읽으며 다음 신호:
  - 재미·웃음: 의외 발언, 허당, 자기 디스, 농담
@@ -130,11 +162,20 @@ TODO (다음 구조 정리 패스): §6, §10, §13 헤더 누락 fix.
  - `selection_reason` (1~2문장)
 7. **겹침 제거** — 두 후보 50%+ 겹치면 점수 높은 쪽만.
 ### 출력
-표 형식 + JSON 둘 다.
+표 형식 + JSON 둘 다. ★ v1.10.9 — 후보 표 *위에* cast_list section 박기 (사용자 review 통합).
+
 표 예시:
 ```
 영상: <video_basename> (<duration_s/60:.1f>분 / source.uploader)
 얼굴 등장: <비율>% (토크 위주 / 노래 위주 / 혼합)
+
+📋 출연진 (cast_list — 잘못된 매핑 있으면 알려주세요)
+| cluster_id | 이름 | 출현 | 역할 | confidence | 대표 frame |
+|------------|------|------|------|------------|------------|
+| 1 | 이찬원 | 482회 | 메인 | 0.95 | frames/f_00345.jpg |
+| 3 | unknown | 287회 | 게스트 | 0.20 | frames/f_01023.jpg |
+| 7 | 영탁 | 154회 | 메인 | 0.90 | frames/f_00832.jpg |
+
 | # | 시각 | 길이 | 톤 | 점수 | 핵심 발화 |
 |---|------|------|------|------|----------|
 | 1 | 1:00~3:00 | 120s | 재미형 | 9.0 | "..." |
@@ -203,6 +244,8 @@ JSON:
 - `source_meta.json` (원본 폴더) — `uploader` → footer
 - `stt.json.segments[].words[]` — ★ 자막 싱크 정밀화 입력 (§6.2b)
 - `face_clusters.json.frames[]` / `clusters[]` — ★ focus_box 결정 입력 (§6.1b)
+- ★ v1.10.9 **`cast_list.json`** — 모드 A 1.5 에서 채워진 cluster_id → name 매핑. §9.5 인물명 grep ground truth. 누락 시 모드 B-1 시작 직전 자동 생성 (모드 A 와 동일 절차)
+- ★ v1.10.9 `cast_list_candidates.json` — backend 가 face_clusters 후처리로 자동 저장. dominant cluster top N + representative_frame jpg 경로 (cast_list.json 입력)
 - ★ **`transcript_source.json`** — yt-dlp 자막 메타. `preference` 필드 분기 의무 (§6.2c):
  - `manual` → `subs/<lang>.srt` 의 텍스트가 dialog ground truth (STT 무시) / timing·비언어는 STT 보강
  - `auto` → STT 우선 + auto srt 보조 reference
@@ -2447,11 +2490,18 @@ selection_reason 에 **제목 발화 위치 + 셋업 cue 수 + 여운 cue 수** 
 
 **0. cast list 사전 채우기 (★ hard rule — explain 인물명 환각 차단)**
 
-모드 A 진입 전 또는 모드 B-1 시작 시점에 *영상 단위* 로 1회:
-1. `source_meta.json` 의 `description` / `uploader` / `title` 에서 출연진 후보 추출
-2. `web_search "<채널명> <회차 제목> 출연진"` 으로 cast list 후보 보강
-3. `face_clusters.clusters[]` 의 frame_count 상위 N개 (보통 5~8) 의 `representative_frame` (frames/f_XXXXX.jpg) 을 vision read → 출연진 후보와 매칭 → cluster_id → name 매핑 결정
-4. 결과를 `face_clusters.json` 의 `clusters[].label` 필드에 채우거나 별도 `cast_list.json` 으로 저장
+★ v1.10.9 — **모드 A 의 1.5 절차**에서 자동 생성. 흐름:
+
+1. **backend 가** `cast_list_candidates.json` 자동 저장 (face_clusters 단계 후처리, dominant cluster top N + `representative_frame` jpg 경로 + frame_count 등 메타)
+2. **모드 A 가** `cast_list.json` 미존재 시 자동 생성:
+   - `cast_list_candidates.json` Read → 각 candidate 의 `representative_frame` 을 Read (vision 인식)
+   - `source_meta.json` 의 `description` / `uploader` / `title` 인명 grep
+   - `web_search "<채널명> <회차 제목> 출연진"` 으로 보강
+   - cluster_id → name 매핑 → `cast_list.json` 저장 (schema: 위 v1.10.9 모드 A 1.5 참조)
+3. **사용자 review** — 모드 A 응답에 cast_list 표 박혀서 사용자가 잘못된 매핑 한 마디 fix
+4. **모드 B 이후** — cast_list.json 의 entries[] 가 §9.5 인물명 grep ground truth
+
+원칙: 확신 안 들면 `unknown` / `게스트1` / `MC` fallback. 메인 출연진만 정확히 매핑. 환각 위험 시 `confidence ≤ 0.3` 박고 표 review 단계에서 사용자 확인.
 
 이 cast_list 가 explain 인물명 grep 검증의 ground truth.
 

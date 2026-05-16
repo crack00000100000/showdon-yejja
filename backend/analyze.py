@@ -31,6 +31,7 @@ from .schema import (
     MARKER_DONE, MARKER_FAILED, MARKER_PARTIAL,
     AnalysisError, AnalysisMeta, AnalysisStatus,
     AppConfig, AudioInfo, CandidateKind,
+    CastListCandidate, CastListCandidatesJson,
     FaceBboxNorm, FaceCluster, FaceClustersJson, FaceDetection, FrameFaces,
     OcrCandidate, OcrCandidatesJson, OcrLocalEntry, OcrLocalJson, OcrTextRegion,
     SceneCutsJson, SourceMeta,
@@ -745,6 +746,60 @@ def _cluster_faces_iou(
     ]
 
 
+def _build_cast_list_candidates(
+    faces: FaceClustersJson,
+    *,
+    top_n: int = 10,
+    min_frame_count: int = 3,
+) -> CastListCandidatesJson:
+    """★ v1.10.9 — face_clusters.json 후처리. dominant cluster top N + 메타 추출.
+
+    각 cluster 의 first_appearance / last_appearance / score_max 를 frame_records
+    traversal 로 구함. faces.clusters 가 이미 frame_count 내림차순이라 top N slice.
+    """
+    cluster_meta: dict[int, dict] = {}
+    for fr in faces.frames:
+        for face in fr.faces:
+            cid = face.cluster_id
+            if cid is None:
+                continue
+            m = cluster_meta.get(cid)
+            if m is None:
+                cluster_meta[cid] = {
+                    "first_t": fr.t,
+                    "last_t": fr.t,
+                    "max_score": face.score,
+                }
+            else:
+                if fr.t < m["first_t"]:
+                    m["first_t"] = fr.t
+                if fr.t > m["last_t"]:
+                    m["last_t"] = fr.t
+                if face.score > m["max_score"]:
+                    m["max_score"] = face.score
+
+    candidates: list[CastListCandidate] = []
+    for cl in faces.clusters[:top_n]:
+        if cl.frame_count < min_frame_count:
+            break
+        m = cluster_meta.get(cl.id, {})
+        candidates.append(CastListCandidate(
+            cluster_id=cl.id,
+            frame_count=cl.frame_count,
+            score_max=round(m.get("max_score", 0.0), 3),
+            first_appearance_t=round(m.get("first_t", 0.0), 2),
+            last_appearance_t=round(m.get("last_t", 0.0), 2),
+            representative_frame=cl.representative_frame,
+        ))
+
+    return CastListCandidatesJson(
+        fps_target=faces.fps_target,
+        total_clusters=len(faces.clusters),
+        kept_top_n=len(candidates),
+        candidates=candidates,
+    )
+
+
 def _faces(
     frames_dir: Path,
     *,
@@ -1247,6 +1302,13 @@ def analyze_video(
                                on_progress=face_cb,
                                is_cancelled=is_cancelled)
                 save_dataclass(faces, output_dir / "face_clusters.json")
+                # ★ v1.10.9 — cast_list_candidates.json 자동 저장 (모드 A cast 매핑 input)
+                try:
+                    cast_candidates = _build_cast_list_candidates(faces)
+                    save_dataclass(cast_candidates,
+                                   output_dir / "cast_list_candidates.json")
+                except Exception as _cc_err:  # noqa: BLE001 — cast_list 실패는 analysis 막지 X
+                    record_error("cast_list_candidates", str(_cc_err))
                 update_step("face_clusters", StepStatus.COMPLETED, time.time() - t0,
                             cluster_count=len(faces.clusters),
                             frames_with_face=faces.frames_with_face)

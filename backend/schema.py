@@ -363,6 +363,68 @@ class FaceClustersJson:
 
 
 # =============================================================================
+# 5b. cast_list_candidates.json — face_cluster top N + 메타 (★ v1.10.9 NEW)
+# =============================================================================
+
+@dataclass
+class CastListCandidate:
+    """★ v1.10.9 — face_clusters 의 dominant cluster top N. cast_list.json 후보 input."""
+    cluster_id: int
+    frame_count: int                  # cluster 의 등장 frame 수
+    score_max: float                  # cluster 안 face score 최대 (0~1)
+    first_appearance_t: float         # 첫 등장 시각 (초)
+    last_appearance_t: float          # 마지막 등장 시각 (초)
+    representative_frame: str         # frames/f_NNNNN.jpg (대표 jpg 경로)
+
+
+@dataclass
+class CastListCandidatesJson:
+    """{data_root}/<채널>/분석/<영상명>/cast_list_candidates.json — ★ v1.10.9 NEW.
+
+    face_clusters 단계 후처리. backend 가 dominant cluster 상위 N개 (frame_count 기준)
+    를 추출해서 저장. 코워크 모드 A 가 read 해서 representative_frame jpg + source_meta
+    description/title + web_search 로 cluster_id → name 매핑 후 cast_list.json 저장
+    (사용자 review = 모드 A 후보 응답에 cast_list section 통합).
+    """
+    schema_version: str = SCHEMA_VERSION
+    kind: str = "cast_list_candidates"
+    fps_target: float = 1.0
+    total_clusters: int = 0           # 전체 cluster 개수 (top N 으로 자르기 전)
+    kept_top_n: int = 10
+    candidates: list[CastListCandidate] = field(default_factory=list)
+
+
+# =============================================================================
+# 5c. cast_list.json — cluster_id → name 매핑 (★ v1.10.9 NEW)
+# =============================================================================
+
+@dataclass
+class CastListEntry:
+    """★ v1.10.9 — cluster_id 와 매핑된 인물 정보. 코워크 모드 A 가 채움."""
+    cluster_id: int
+    name: str                         # 실명 또는 fallback ("게스트1", "MC", "이모님" 등)
+    aliases: list[str] = field(default_factory=list)
+    role: str = ""                    # 메인 / 게스트 / MC / 사회자 / 기타
+    confidence: float = 0.0           # 0~1 (모드 A 의 매핑 확신도)
+    representative_frame: str = ""    # frames/f_NNNNN.jpg
+
+
+@dataclass
+class CastListJson:
+    """{data_root}/<채널>/분석/<영상명>/cast_list.json — ★ v1.10.9 NEW.
+
+    코워크 모드 A 가 cast_list_candidates.json 보고 매핑 후 저장. backend 직접 안 만듦.
+    explain_validator / edit_plan_validator 등이 §9.5 인물명 grep ground truth 로 활용.
+
+    legacy 형식 (clusters[] 또는 list of {name, aliases}) 은 explain_validator 가
+    graceful read — 새 형식 (entries[]) 와 둘 다 지원 (이전 영상 호환).
+    """
+    schema_version: str = SCHEMA_VERSION
+    kind: str = "cast_list"
+    entries: list[CastListEntry] = field(default_factory=list)
+
+
+# =============================================================================
 # 6. edit_plan.json — 3단계 출력 (PRD §3.6) ★ 핵심
 # =============================================================================
 
