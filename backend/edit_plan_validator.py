@@ -98,6 +98,28 @@ def auto_fix_title(plan: dict[str, Any]) -> list[tuple[str, str, str]]:
     return fixes
 
 
+def check_single_cut_long_duration(
+    sub_cuts: list[dict],
+    shorts: dict,
+    min_long_s: float = 60.0,
+) -> list[tuple[str, str, str]]:
+    """v1.10.7 (D) — single sub_cut 인데 duration ≥ 60s 인 케이스 hard reject.
+
+    audit 발견 (v1.10.5 176 영상): single sub_cut + 60s+ 영상 8개 → 거의 wide
+    shot 단체샷 retention 약점. 컷 분할 강제.
+    """
+    violations = []
+    duration = shorts.get("duration_s") or (shorts.get("end_s", 0) - shorts.get("start_s", 0))
+    if len(sub_cuts) == 1 and duration >= min_long_s:
+        violations.append((
+            "hard", "6.1_single_cut_60s",
+            f"single sub_cut + duration {duration:.1f}s ≥ {min_long_s:.0f}s — "
+            f"wide shot 단체샷 retention 약점 패턴. sub_cut 분할 의무 "
+            f"(scene_cut / 화자 transition / 펀치라인 직전 등 §6.1 trigger)"
+        ))
+    return violations
+
+
 def check_sub_cut_mid_speech(
     sub_cuts: list[dict],
     dialog_cues: list,  # list of Cue
@@ -158,76 +180,11 @@ def check_punch_in_shorts(
     return violations
 
 
-def check_recall_clip(
-    shorts: dict,
-    sub_cuts: list[dict],
-    face_clusters_path: Optional[Path],
-    cast_list_path: Optional[Path],
-    margin_s: float = 5.0,
-) -> list[tuple[str, str, str]]:
-    """§13.5 11d v1.10.2 — 후보 start_s ±margin 안 dominant face cluster 가 발화자 cluster 와 일치하는지.
-
-    cast_list 가 있어야 발화자 cluster 식별 가능. 없으면 *cluster 변화 빈도* 만으로 heuristic.
-    """
-    violations = []
-    if face_clusters_path is None or not face_clusters_path.exists():
-        return violations
-    try:
-        fc = json.loads(face_clusters_path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        return violations
-    frames = fc.get("frames", [])
-    shorts_start = shorts.get("start_s", 0)
-    # start_s ± margin 의 frame 들
-    nearby = [
-        fr for fr in frames
-        if shorts_start - margin_s <= fr.get("t", -1) <= shorts_start + margin_s
-    ]
-    if not nearby:
-        return violations
-    # dominant cluster (largest face per frame)
-    cluster_ids = []
-    for fr in nearby:
-        faces = fr.get("faces", [])
-        if not faces:
-            cluster_ids.append(None)
-            continue
-        largest = max(
-            faces,
-            key=lambda f: f.get("bbox_norm", {}).get("w", 0) * f.get("bbox_norm", {}).get("h", 0),
-            default=None,
-        )
-        cluster_ids.append(largest.get("cluster_id") if largest else None)
-    # 첫 5초 (start_s 부근) 의 cluster 분포
-    early = [cid for fr, cid in zip(nearby, cluster_ids) if fr.get("t", 0) <= shorts_start + 2.0]
-    if not early:
-        return violations
-    # 가장 많이 등장하는 cluster (mode)
-    from collections import Counter
-    early_dom = Counter(c for c in early if c is not None).most_common(1)
-    if not early_dom:
-        return violations
-    early_cluster = early_dom[0][0]
-    # 후반 cluster (start_s + 2 ~ start_s + 8) 와 비교
-    late = [
-        cid for fr, cid in zip(nearby, cluster_ids)
-        if shorts_start + 2.0 < fr.get("t", 0) <= shorts_start + 8.0
-    ]
-    if not late:
-        return violations
-    late_dom = Counter(c for c in late if c is not None).most_common(1)
-    if not late_dom:
-        return violations
-    late_cluster = late_dom[0][0]
-    if early_cluster != late_cluster:
-        # 초반 cluster 가 본 토크 cluster 와 다름 — cutaway/회상 의심
-        violations.append((
-            "soft", "13.5_11d_recall_clip",
-            f"shorts.start_s {shorts_start:.1f}s ±{margin_s}s dominant cluster "
-            f"전환 (초반 cluster_id={early_cluster}, 후반={late_cluster}). "
-            f"회상/cutaway 인서트 의심 → 발화자 cluster 등장 시점으로 start_s 재선정 검토"
-        ))
-    return violations
+# ★ v1.10.7 — check_recall_clip 폐기.
+# 사유: 176 영상 audit 결과 120/176 (68%) false positive. face_clusters.json 의
+# cluster_id 가 fine-grained 라 같은 인물도 매 frame cluster_id 다름 → cluster
+# 전환 = 회상 클립 가정 X. v1.10.9 의 cluster consolidation + cast_list 매핑
+# 인프라 fix 후 재활성화 검토.
 
 
 def validate_edit_plan(
@@ -256,10 +213,9 @@ def validate_edit_plan(
     candidate = plan.get("candidate", {})
     shorts = plan.get("shorts", {})
     violations.extend(check_punch_in_shorts(candidate, shorts))
+    violations.extend(check_single_cut_long_duration(sub_cuts, shorts))
 
-    face_clusters_path = source_dir / "face_clusters.json" if source_dir else None
-    cast_list_path = source_dir / "cast_list.json" if source_dir else None
-    violations.extend(check_recall_clip(shorts, sub_cuts, face_clusters_path, cast_list_path))
+    # v1.10.7 — recall_clip 룰 폐기 (위 주석 참조)
 
     return {
         "violations": violations,

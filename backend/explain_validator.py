@@ -162,19 +162,40 @@ def check_question_mark_context(
     return violations
 
 
+# v1.10.7 — 일반 명사 화이트리스트. 인명이 아닌 직책·호칭 단독 단어 차감
+# (audit false positive 사례: '식당 이모님' = cafeteria aunt 일반 명사)
+_NAME_CANDIDATE_WHITELIST = {
+    # 직책
+    "MC", "호스트", "게스트", "사장", "사장님", "감독", "감독님", "대표",
+    "PD", "작가", "기자", "선수", "팀장",
+    # 호칭 (단독 인명 아님)
+    "오빠", "언니", "누나", "형", "동생", "아빠", "엄마", "아버지", "어머니",
+    "선배", "선생", "선생님", "이모", "삼촌", "고모", "할머니", "할아버지",
+    # 일반 명사
+    "친구", "동료", "멤버", "사람", "본인", "자기", "주인", "주민",
+    "식당", "회사", "학교", "교실", "사무실", "공장",
+    # 그룹·캐릭터 (인명 X)
+    "다비치", "에픽하이", "본헤이터", "라꼰즈",
+}
+
+
 def _extract_name_candidates(text: str) -> list[str]:
     """explain 텍스트에서 인물명 후보 추출 — 호칭 접미가 뒤에 붙은 한글 단어만.
 
     v1.10.0 audit 의 환각 케이스 ("다영 언니", "혜정님") 같이 호칭 접미가 뒤따르는
     한글 2~4자 단어만 grep 대상. 일반 명사 단독 등장 ("결론", "도전") false positive 회피.
+
+    v1.10.7: _NAME_CANDIDATE_WHITELIST 적용 — '식당 이모님' 같은 일반 명사 차감.
     """
     cleaned = re.sub(r"[()@\d]", " ", text)
-    # 호칭 접미 매칭 — 다영 언니 / 혜정님 / 종운 씨 같은 패턴
     candidates: list[str] = []
-    # 명시적 호칭 접미 패턴
     for honor in ["언니", "오빠", "형", "누나", "선배", "선생님", "님", "씨"]:
         for m in re.finditer(rf"([가-힣]{{2,4}})\s*{honor}", cleaned):
-            candidates.append(m.group(1))
+            name = m.group(1)
+            # v1.10.7 화이트리스트 차감
+            if name in _NAME_CANDIDATE_WHITELIST:
+                continue
+            candidates.append(name)
     return candidates
 
 
