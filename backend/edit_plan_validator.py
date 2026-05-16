@@ -98,6 +98,98 @@ def auto_fix_title(plan: dict[str, Any]) -> list[tuple[str, str, str]]:
     return fixes
 
 
+def _normalize_for_match(text: str) -> str:
+    """공백 / 부호 / 검열 기호 제거 — substring 비교 normalize."""
+    return re.sub(r"[\s@\W]+", "", text)
+
+
+def _bbox_union(a: dict, b: dict) -> dict:
+    """두 bbox 의 합집합 (left·top min, right·bottom max)."""
+    ax2 = a["x"] + a["w"]
+    ay2 = a["y"] + a["h"]
+    bx2 = b["x"] + b["w"]
+    by2 = b["y"] + b["h"]
+    nx = min(a["x"], b["x"])
+    ny = min(a["y"], b["y"])
+    nx2 = max(ax2, bx2)
+    ny2 = max(ay2, by2)
+    return {"x": nx, "y": ny, "w": nx2 - nx, "h": ny2 - ny}
+
+
+def auto_fill_hide_caption_regions(
+    plan: dict,
+    dialog_cues: list,
+    ocr_local: Optional[dict],
+) -> list[tuple[str, str, str]]:
+    """★ v1.10.8 — sub_cut 시간대 OCR regions 중 dialog substring 일치 자막의 bbox 자동 채움.
+
+    sub_cut.hide_caption_regions 에 mutate. 기존 OCR 영상 (regions=None) 은 graceful skip.
+
+    Args:
+        plan: edit_plan dict
+        dialog_cues: explain_validator.Cue 리스트 (sub_cut 안 timeline 기준)
+        ocr_local: ocr_local.json dict 또는 None
+
+    Returns: 적용된 fix list — (rule, before, after)
+    """
+    fixes = []
+    if not ocr_local or "entries" not in ocr_local:
+        return fixes
+    entries = ocr_local.get("entries", [])
+    sub_cuts = plan.get("sub_cuts", [])
+    if not sub_cuts:
+        return fixes
+
+    # 전체 dialog 텍스트 정규화 (sub_cut 단위로 매칭하려면 시각 변환 필요)
+    # dialog cue 의 timeline 은 sub_cut 안 누적 — 절대 시각 매핑 필요
+    # 간단하게: 모든 dialog 텍스트를 한 string 으로 normalize
+    dialog_full = _normalize_for_match(" ".join(c.text for c in dialog_cues))
+    if not dialog_full:
+        return fixes
+
+    for sc in sub_cuts:
+        sc_start = sc.get("start", 0)
+        sc_end = sc.get("end", 0)
+        # 이 sub_cut 시간대의 OCR entries
+        sc_entries = [e for e in entries if sc_start <= e.get("t_abs", -1) <= sc_end]
+        # text별 bbox 합집합
+        text_to_bbox: dict[str, dict] = {}
+        for e in sc_entries:
+            regions = e.get("regions")
+            if not regions:
+                continue
+            for r in regions:
+                text = r.get("text", "").strip()
+                if not text or len(text) < 2:
+                    continue
+                norm = _normalize_for_match(text)
+                if not norm or norm not in dialog_full:
+                    # dialog 와 일치 X — 워터마크 / 코너자막 / 무관 텍스트
+                    continue
+                bbox = {
+                    "x": r.get("x", 0), "y": r.get("y", 0),
+                    "w": r.get("w", 0), "h": r.get("h", 0),
+                }
+                if text in text_to_bbox:
+                    text_to_bbox[text] = _bbox_union(text_to_bbox[text], bbox)
+                else:
+                    text_to_bbox[text] = bbox
+        # mutate sub_cut.hide_caption_regions
+        if text_to_bbox:
+            new_regions = [
+                {"x": round(b["x"], 4), "y": round(b["y"], 4),
+                 "w": round(b["w"], 4), "h": round(b["h"], 4), "text": t}
+                for t, b in text_to_bbox.items()
+            ]
+            sc["hide_caption_regions"] = new_regions
+            fixes.append((
+                "hide_caption_auto_fill",
+                f"sub_cut[{sc.get('index')}] regions=0",
+                f"sub_cut[{sc.get('index')}] regions={len(new_regions)} (texts: {list(text_to_bbox.keys())[:3]})",
+            ))
+    return fixes
+
+
 def check_single_cut_long_duration(
     sub_cuts: list[dict],
     shorts: dict,
@@ -187,25 +279,44 @@ def check_punch_in_shorts(
 # 인프라 fix 후 재활성화 검토.
 
 
+def _load_ocr_local(source_dir: Optional[Path]) -> Optional[dict]:
+    """source_dir 안 ocr_local.json 로드 (없으면 None)."""
+    if not source_dir:
+        return None
+    p = Path(source_dir) / "ocr_local.json"
+    if not p.exists():
+        return None
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
 def validate_edit_plan(
     plan: dict[str, Any],
     dialog_cues: list,  # list of explain_validator.Cue
     source_dir: Optional[Path] = None,
     auto_fix: bool = True,
+    ocr_local: Optional[dict] = None,
 ) -> dict[str, Any]:
     """edit_plan.json 전체 검증 + auto-fix.
 
     Args:
       plan: edit_plan.json 의 dict
       dialog_cues: explain_validator.parse_srt(dialog.srt) 결과
-      source_dir: analysis 폴더 (face_clusters / cast_list 참조용)
-      auto_fix: True 면 title 자동 줄바꿈 적용 (plan mutate)
+      source_dir: analysis 폴더 (face_clusters / cast_list / ocr_local 참조용)
+      auto_fix: True 면 title 자동 줄바꿈 + hide_caption_regions 자동 채움 (plan mutate)
+      ocr_local: 미리 로드된 ocr_local.json (None 이면 source_dir 에서 자동 로드 시도)
     """
     violations: list[tuple[str, str, str]] = []
     fixes_applied: list[tuple[str, str, str]] = []
 
     if auto_fix:
         fixes_applied.extend(auto_fix_title(plan))
+        # v1.10.8 — hide_caption_regions 자동 채움 (OCR bbox 기반)
+        if ocr_local is None:
+            ocr_local = _load_ocr_local(source_dir)
+        fixes_applied.extend(auto_fill_hide_caption_regions(plan, dialog_cues, ocr_local))
 
     sub_cuts = plan.get("sub_cuts", [])
     violations.extend(check_sub_cut_mid_speech(sub_cuts, dialog_cues))
@@ -225,6 +336,7 @@ def validate_edit_plan(
             "title_line_count": plan.get("template", {}).get("title_line_count", 1),
             "hard_violations": sum(1 for v in violations if v[0] == "hard"),
             "soft_violations": sum(1 for v in violations if v[0] == "soft"),
+            "hide_caption_filled": sum(1 for f in fixes_applied if f[0] == "hide_caption_auto_fill"),
         },
     }
 

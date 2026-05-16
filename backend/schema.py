@@ -241,12 +241,31 @@ class OcrCandidatesJson:
 # =============================================================================
 
 @dataclass
+class OcrTextRegion:
+    """★ v1.10.8 NEW — Apple Vision VNRecognizedTextObservation 결과 (text + bbox).
+
+    bbox 는 *Top-Left origin 정규화 좌표* (0~1). Vision API 의 Cocoa Bottom-Left
+    origin 을 analyze.py 에서 변환해 저장.
+
+    hide_caption mask 작업의 input — dialog substring 일치 자체 자막의 bbox 만 mask 후보.
+    """
+    text: str
+    score: float
+    x: float
+    y: float
+    w: float
+    h: float
+
+
+@dataclass
 class OcrLocalEntry:
     """ocr_candidates 의 i 와 1:1 매칭. 코워크 Claude Vision OCR 과 cross-check 용."""
     i: int                              # ocr_candidates.json 의 i
     t_abs: float                        # 영상 절대 시각 (초)
-    text: str                           # PaddleOCR 결과 (여러 줄은 \n 결합)
+    text: str                           # 합쳐진 text (여러 줄은 \n 결합)
     score: float = 0.0                  # 평균 신뢰도 (0~1)
+    # ★ v1.10.8 NEW — text 별 bbox detail. 기존 영상은 None (graceful fallback)
+    regions: Optional[list[OcrTextRegion]] = None
 
 
 @dataclass
@@ -262,6 +281,38 @@ class OcrLocalJson:
     min_score: float = 0.5
     candidate_count: int = 0
     entries: list[OcrLocalEntry] = field(default_factory=list)
+
+
+# =============================================================================
+# 4c. transcript_source.json — yt-dlp 자막 메타 (★ v1.9.5 NEW)
+# =============================================================================
+
+@dataclass
+class TranscriptSourceLang:
+    """자막 1개 (언어별 manual 또는 auto)."""
+    lang: str                          # "ko" | "en" | ...
+    type: str                          # "manual" | "auto"
+    path: str                          # 분석 폴더 기준 상대경로 (예: "subs/ko.srt")
+    segment_count: int = 0             # srt segment 개수 (디버그용)
+
+
+@dataclass
+class TranscriptSourceJson:
+    """{data_root}/<채널>/분석/<영상명>/transcript_source.json — ★ v1.9.5 NEW.
+
+    yt-dlp 가 영상과 같이 받은 자막 메타. info.json 의 subtitles / automatic_captions
+    키로 manual / auto 정확히 구별. 분석 폴더 subs/ 로 자막 파일 복사하여 결과 폴더
+    이주 시 손실 방지.
+
+    코워크 Claude 가 dialog 작성 시 우선순위 결정:
+      - preference == "manual" → dialog 텍스트는 manual srt / timing/비언어는 STT (하이브리드)
+      - preference == "auto"   → STT 우선 / auto srt 는 보조 reference
+      - preference == "none"   → STT + OCR 표준 흐름 (v1.9.4 그대로)
+    """
+    schema_version: str = SCHEMA_VERSION
+    sources: list[TranscriptSourceLang] = field(default_factory=list)
+    preference: str = "none"           # "manual" | "auto" | "none"
+    info_json_relpath: Optional[str] = None  # debug 용 — info.json 원본 위치
 
 
 # =============================================================================
@@ -359,6 +410,23 @@ class FocusBox:
 
 
 @dataclass
+class HideCaptionRegion:
+    """★ v1.10.8 NEW — 자체 자막 mask 영역 (검정 박스 덮기).
+
+    정규화 좌표 (0~1, Top-Left origin). edit_plan_validator 가 sub_cut 시간대 OCR
+    결과 중 *dialog substring 일치* 자체 자막의 bbox 자동 채움. LLM 박지 X.
+
+    edit.py rendering 단계에서 sub_cut 영역에 검정 직사각형 draw — 원본 자체 자막
+    가림. focus_box crop 과 별도 layer.
+    """
+    x: float = 0.0
+    y: float = 0.0
+    w: float = 1.0
+    h: float = 1.0
+    text: str = ""                      # 디버그·로깅용 (어떤 자막 가리는지)
+
+
+@dataclass
 class EditPlanSubCut:
     index: int
     start: float
@@ -366,6 +434,8 @@ class EditPlanSubCut:
     duration: float
     # v1.2 NEW — 클립별 zoom/crop. None 이면 폴백 (16:9 → 1:1 상단 crop).
     focus_box: Optional[FocusBox] = None
+    # ★ v1.10.8 NEW — 자체 자막 mask 영역. edit_plan_validator 가 자동 채움
+    hide_caption_regions: list[HideCaptionRegion] = field(default_factory=list)
 
 
 @dataclass
@@ -566,14 +636,13 @@ class AppConfig:
     # 채널 정보 (v1.1)
     channel: ChannelConfig = field(default_factory=ChannelConfig)
 
-    # STT 설정 — Apple Silicon CPU 최적
-    stt_model: str = "large-v3"            # 대형 다국어 모델 (한·영 혼용 최강)
-    stt_compute_type: str = "float16"      # v1.5 — int8→float16, 정확도 +5~10% / 시간 +30~50%
-                                            # 야간 무인 분석 가정. 시간 우선이면 "int8" 로 변경
+    # STT 설정 — Apple Silicon GPU (MLX) 활용
+    # ★ v1.9.3+ — faster-whisper 제거, mlx-whisper 단독 (검증 완료: 6.6x 빠름)
+    stt_mlx_model_repo: str = "mlx-community/whisper-large-v3-mlx"
+                                            # mlx-whisper 모델 path (Hugging Face)
     stt_language: Optional[str] = None     # None = auto-detect (한·영 혼용 권장). "ko"/"en" 강제 가능
-    stt_cpu_threads: int = 8               # faster-whisper OMP 스레드 수.
-                                            # 디폴트(4) 대신 M4 Pro P코어 8개 활용 → STT 1.5~2x 빠름
-                                            # 시스템 반응성 우선이면 4~6 권장
+    stt_temperature: float = 0.0           # 재현성 ↑. 0.0 = greedy
+    stt_condition_on_previous: bool = False # cascade error 방지
     # v1.5 — 인물·고유명사 인식 정확도 ↑ (initial_prompt 로 도메인 어휘 사전 주입)
     stt_initial_prompt: str = (
         "에픽하이 타블로 투컷 미쿡이 다이나믹듀오 개코 최자 어반자카파 "
@@ -581,14 +650,18 @@ class AppConfig:
         "예원아빠 하루아빠 은우아빠 쇼츠 유튜브 아이돌."
     )
 
+    # ★ v1.9.3+ — 초고성능 모드 제거. mlx-whisper + Apple Vision 모두 GPU only 라
+    # CPU thread 조절 영향 거의 없음 (face_clusters 5초 단계만 미세 영향).
+    # 단순화 위해 토글 / 필드 제거.
+
     # Scene·프레임
     scene_threshold: float = 0.3
     frame_extraction_fps: float = 1.0
     frame_scale_w: int = 1280              # Vision OCR 정확도 위해 720 → 1280 (PRD §2 어덴덤)
 
-    # 로컬 OCR 더블체킹 (v1.1 어덴덤)
-    enable_local_ocr: bool = True          # PaddleOCR korean 으로 ocr_candidates frame 더블체킹
-    local_ocr_lang: str = "korean"         # paddleocr 언어 코드 ("korean", "en", "japan", ...)
+    # 로컬 OCR — ★ v1.9.3+ Apple Vision 단독 (PaddleOCR 제거됨)
+    # macOS Vision framework, Metal GPU, ~10x 빠름. 한국어 정확도 우수.
+    enable_local_ocr: bool = True          # 로컬 OCR 활성화
     local_ocr_min_score: float = 0.5       # 이 미만 신뢰도 텍스트는 무시
 
     # 큐 동작
@@ -609,6 +682,15 @@ class AppConfig:
     capcut_server_url: str = "http://localhost:9000"
     # v1.6 — VectCutAPI server cwd (dfd_<id>/ 폴더 생성 위치). git clone 한 곳.
     capcut_server_cwd: str = "~/showdon/showdon-yejja/VectCutAPI"
+
+    # ★ v1.9.3 — 디버그 자동출력 폴더 (자동편집 결과물 한 곳에 모아 비교용).
+    # backend/edit.py 의 DEBUG_AUTO_OUTPUT_DIR 가 다음 우선순위로 결정:
+    #   1) 환경변수 YEJJA_PROD=1 → None (PROD = 자동복사 OFF)
+    #   2) 환경변수 YEJJA_DEBUG_AUTO_DIR (수동 override)
+    #   3) AppConfig.debug_auto_output_dir (이 필드)
+    #   4) 빈 문자열 또는 None = 자동복사 OFF
+    # 디버깅 탭에서 GUI 로 변경 가능.
+    debug_auto_output_dir: str = "~/showdon/yejjas_test/auto"
 
 
 # =============================================================================
@@ -821,6 +903,8 @@ __all__ = [
     # OCR
     "OcrCandidate", "OcrCandidatesJson",
     "OcrLocalEntry", "OcrLocalJson",
+    # Transcript source (★ v1.9.5)
+    "TranscriptSourceLang", "TranscriptSourceJson",
     # Face
     "FaceBboxNorm", "FaceDetection", "FrameFaces", "FaceCluster", "FaceClustersJson",
     # EditPlan (3단계)

@@ -957,6 +957,40 @@ def _trim_black_edges(
             pass
 
 
+def _build_hide_caption_drawbox(hide_caption_regions: Optional[list]) -> str:
+    """★ v1.10.8 — hide_caption_regions 의 normalized bbox (0~1, source frame 기준) 을
+    drawbox filter 체인으로 변환. crop 전에 적용해서 source 좌표계에서 mask.
+
+    각 region 은 dict-like or HideCaptionRegion dataclass. 빈 list / None 이면 "" 반환.
+
+    drawbox 의 x/y/w/h 는 input frame px (iw/ih) — normalized → iw/ih 곱셈으로 표현.
+    """
+    if not hide_caption_regions:
+        return ""
+    parts = []
+    for r in hide_caption_regions:
+        # dataclass or dict 둘 다 지원
+        if hasattr(r, "x"):
+            rx, ry, rw, rh = r.x, r.y, r.w, r.h
+        else:
+            rx = r.get("x", 0); ry = r.get("y", 0)
+            rw = r.get("w", 0); rh = r.get("h", 0)
+        if rw <= 0 or rh <= 0:
+            continue
+        # 살짝 padding (1~2% 여유) — OCR bbox 가 글자 윤곽에 딱 붙어 가장자리 새는 케이스 방지
+        pad_x = 0.005
+        pad_y = 0.008
+        rx = max(0.0, rx - pad_x)
+        ry = max(0.0, ry - pad_y)
+        rw = min(1.0 - rx, rw + 2 * pad_x)
+        rh = min(1.0 - ry, rh + 2 * pad_y)
+        parts.append(
+            f"drawbox=x=iw*{rx:.4f}:y=ih*{ry:.4f}:"
+            f"w=iw*{rw:.4f}:h=ih*{rh:.4f}:color=black@1.0:t=fill"
+        )
+    return ",".join(parts)
+
+
 def _ffmpeg_extract_subcut(
     video: Path,
     start_s: float,
@@ -968,6 +1002,7 @@ def _ffmpeg_extract_subcut(
     target_size: int = CUT_SQUARE_SIZE,
     trim_black: bool = True,
     apply_focus_box: bool = True,
+    hide_caption_regions: Optional[list] = None,
     is_cancelled: CancelCb | None = None,
 ) -> None:
     """원본 영상의 [start_s, end_s] 구간을 1:1 정사각형 mp4 로 추출.
@@ -992,20 +1027,32 @@ def _ffmpeg_extract_subcut(
             f"timestamp 중복 가능성."
         )
 
+    # ★ v1.10.8 — hide_caption_regions drawbox (source 좌표계, crop 전)
+    hc_filter = _build_hide_caption_drawbox(hide_caption_regions)
+
     # v1.6 — apply_focus_box=False (capcut export 모드) 면 영상 원본 비율 유지
     if apply_focus_box:
         crop = _build_crop_filter(focus_box)
         # focus_box 비율이 1:1 아니어도 stretch 방지.
         # increase + crop = 비율 유지하며 정사각형 채움 (가장자리만 살짝 잘림, letterbox X)
-        vf = (
-            f"{crop},"
-            f"scale={target_size}:{target_size}:force_original_aspect_ratio=increase:flags=lanczos,"
-            f"crop={target_size}:{target_size},"
-            f"setsar=1"
+        # drawbox (자체 자막 mask) → crop → scale → crop → setsar 순서
+        vf_parts = []
+        if hc_filter:
+            vf_parts.append(hc_filter)
+        vf_parts.append(crop)
+        vf_parts.append(
+            f"scale={target_size}:{target_size}:force_original_aspect_ratio=increase:flags=lanczos"
         )
+        vf_parts.append(f"crop={target_size}:{target_size}")
+        vf_parts.append("setsar=1")
+        vf = ",".join(vf_parts)
     else:
         # capcut export 모드 — 영상 원본 비율 그대로 (시간만 자름)
-        vf = "setsar=1"
+        # 단, hide_caption mask 는 capcut export 도 적용 (원본 자막 노출 방지)
+        if hc_filter:
+            vf = f"{hc_filter},setsar=1"
+        else:
+            vf = "setsar=1"
 
     cmd = [
         _resolve_bin("ffmpeg"), "-y",
@@ -1449,10 +1496,40 @@ class FfmpegRenderer(Renderer):
                 _v10_source_dir = Path(plan.source.analysis_dir)
             if _v10_dialog_path.exists():
                 _v10_dialog_cues = _v10_parse_srt(_v10_dialog_path)
+                # v1.10.8 — auto_fix=True 로 호출하면 hide_caption_regions 자동 채움
+                # (title_text 는 위에서 이미 적용 — _v10_auto_fix_title 가 중복 호출 무해)
                 _v10_plan_result = _v10_validate_edit_plan(
                     _v10_plan_dict, _v10_dialog_cues,
-                    _v10_source_dir, auto_fix=False,
+                    _v10_source_dir, auto_fix=True,
                 )
+                # ★ v1.10.8 — hide_caption_regions sync dict → dataclass
+                from backend.schema import HideCaptionRegion as _HCR
+                _hc_synced = 0
+                for _sc_dict, _sc_obj in zip(
+                    _v10_plan_dict.get("sub_cuts", []), plan.sub_cuts
+                ):
+                    _regions = _sc_dict.get("hide_caption_regions") or []
+                    if _regions:
+                        _sc_obj.hide_caption_regions = [
+                            _HCR(
+                                x=float(_r.get("x", 0)),
+                                y=float(_r.get("y", 0)),
+                                w=float(_r.get("w", 0)),
+                                h=float(_r.get("h", 0)),
+                                text=str(_r.get("text", "")),
+                            )
+                            for _r in _regions
+                        ]
+                        _hc_synced += len(_regions)
+                for _rule, _before, _after in _v10_plan_result.get("fixes_applied", []):
+                    if _rule == "hide_caption_auto_fill":
+                        emit("validator_fix", 0, f"🩹 v1.10.8 auto-fill hide_caption: {_after}")
+                if _hc_synced:
+                    emit(
+                        "validator_fix", 0,
+                        f"🩹 v1.10.8 hide_caption_regions {_hc_synced}개 자동 채움 "
+                        f"(OCR bbox + dialog 일치 자체 자막)",
+                    )
                 for _sev, _rule, _msg in _v10_plan_result["violations"]:
                     emit(
                         "validator_warning", 0,
@@ -1553,11 +1630,16 @@ class FfmpegRenderer(Renderer):
                 )
             elif not apply_focus_box:
                 fb_label = " (capcut: 원본 비율)"
+            # ★ v1.10.8 — hide_caption_regions 전달 (OCR bbox 기반 mask)
+            hcr_for_render = c.hide_caption_regions if c.hide_caption_regions else None
+            if hcr_for_render:
+                fb_label += f" mask({len(hcr_for_render)})"
             _ffmpeg_extract_subcut(
                 source_video, c.start, c.end, cut_path,
                 encoding=encoding,
                 focus_box=adjusted_focus_box,
                 apply_focus_box=apply_focus_box,
+                hide_caption_regions=hcr_for_render,
                 is_cancelled=is_cancelled,
             )
             cut_paths.append(cut_path)

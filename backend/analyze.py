@@ -32,7 +32,7 @@ from .schema import (
     AnalysisError, AnalysisMeta, AnalysisStatus,
     AppConfig, AudioInfo, CandidateKind,
     FaceBboxNorm, FaceCluster, FaceClustersJson, FaceDetection, FrameFaces,
-    OcrCandidate, OcrCandidatesJson, OcrLocalEntry, OcrLocalJson,
+    OcrCandidate, OcrCandidatesJson, OcrLocalEntry, OcrLocalJson, OcrTextRegion,
     SceneCutsJson, SourceMeta,
     StepStatus, SttJson, SttSegment, SttWord,
     VideoInfo,
@@ -561,6 +561,7 @@ def _ocr_local_apple_vision(
 
                 texts: list[str] = []
                 scores: list[float] = []
+                regions: list[OcrTextRegion] = []
                 observations = request.results() or []
                 for obs in observations:
                     top = obs.topCandidates_(1)
@@ -571,6 +572,24 @@ def _ocr_local_apple_vision(
                         if text and score >= min_score:
                             texts.append(text)
                             scores.append(score)
+                            # ★ v1.10.8 — bbox 추출 (Cocoa Bottom-Left → Top-Left 변환)
+                            # Vision boundingBox: CGRect (origin=BL, normalized 0~1)
+                            try:
+                                bbox = obs.boundingBox()
+                                bx = float(bbox.origin.x)
+                                by_bl = float(bbox.origin.y)
+                                bw = float(bbox.size.width)
+                                bh = float(bbox.size.height)
+                                # Top-Left origin 으로 변환: y_tl = 1 - (y_bl + h)
+                                by_tl = max(0.0, 1.0 - (by_bl + bh))
+                                regions.append(OcrTextRegion(
+                                    text=text, score=round(score, 3),
+                                    x=round(bx, 4), y=round(by_tl, 4),
+                                    w=round(bw, 4), h=round(bh, 4),
+                                ))
+                            except Exception:
+                                # bbox 추출 실패해도 text 는 유지 (regions 만 누락)
+                                pass
             except Exception:
                 # 한 frame 실패 → skip (전체 단계 실패 방지)
                 continue
@@ -581,6 +600,7 @@ def _ocr_local_apple_vision(
                     t_abs=cand.t_abs,
                     text="\n".join(texts),
                     score=round(sum(scores) / len(scores), 3) if scores else 0.0,
+                    regions=regions if regions else None,
                 )
                 entries.append(entry)
         finally:
